@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bleachmark"
+version = "0.1.0"
+description = "Detect and bleach watermarks and steganographic carriers in LLM text"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "Ron Dilley" }]
+dependencies = []
+
+[project.optional-dependencies]
+model = ["numpy>=1.24"]
+keyed = ["numpy>=1.24"]
+dev = ["pytest>=7", "ruff>=0.1", "mypy>=1.6"]
+
+[project.scripts]
+bleachmark = "bleachmark.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"

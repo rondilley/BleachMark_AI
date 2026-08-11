@@ -1,0 +1,14 @@
+{
+  "zero_width": {
+    "singles": [8203, 8204, 8205, 8288, 8289, 8290, 8291, 8292, 65279],
+    "comment": "ZWSP ZWNJ ZWJ WJ and invisible math operators plus FEFF"
+  },
+  "tags_block": { "start": 917504, "end": 917631 },
+  "variation_selectors": [
+    { "start": 65024, "end": 65039 },
+    { "start": 917760, "end": 917999 }
+  ],
+  "bidi_overrides": [8237, 8238],
+  "bidi_marks": [8206, 8207, 1564],
+  "typographic_spaces": [160, 8199, 8239, 8192, 8193, 8194, 8195, 8196, 8197, 8198, 8200, 8201, 8202, 8203]
+}
