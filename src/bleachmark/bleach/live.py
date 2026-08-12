@@ -522,6 +522,13 @@ def run_prose_calibration(candidate_provider: str, reference_providers: list[str
         return provider, (model or None)
 
     def _label(provider: str, model) -> str:
+        if provider == "local" and not model:
+            try:  # name the model the local engine actually serves, not the default
+                from ..runtime.providers import list_local_models
+                served = list_local_models()
+                model = served[0] if served else None
+            except Exception:
+                pass
         return f"{provider}:{model or DEFAULT_MODELS.get(provider, '')}"
 
     def corpus(provider: str, model=None) -> list[list[str]]:

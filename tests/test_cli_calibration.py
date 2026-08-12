@@ -131,6 +131,32 @@ def test_cli_exit_one_on_operational_failure(monkeypatch):
     assert rc == 1                    # non-zero only when the probe cannot run
 
 
+def test_cli_parser_has_hardware():
+    args = cli.build_parser().parse_args(["hardware", "--json"])
+    assert args.command == "hardware"
+    assert args.json is True
+
+
+def test_cmd_hardware_emits_report(monkeypatch, capsys):
+    canned = {
+        "hardware": {"accelerator": "cuda", "cuda_version": "13.2", "cpu_count": 20,
+                     "ram_mb": 262144, "total_vram_mb": 32607,
+                     "gpu": {"name": "RTX 5090", "vram_total_mb": 32607, "vram_free_mb": 30000,
+                             "driver": "596.49"}},
+        "endpoint": {"url": "http://tars.uberadmin.com:5150/v1", "reachable": True,
+                     "served_models": ["unsloth/Llama-3.3-70B-Instruct-GGUF"], "error": ""},
+        "recommended": {"reference": {"model": "Qwen2.5-32B-Instruct", "fits": True,
+                                      "vram_mb": 21749, "hf_repo": "bartowski/Qwen2.5-32B-Instruct-GGUF",
+                                      "note": "fits"}},
+    }
+    monkeypatch.setattr(cli, "_hardware_report", lambda root=".": canned)
+    rc = cli.main(["hardware"])
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "RTX 5090" in out and "tars.uberadmin.com:5150" in out
+    assert "Qwen2.5-32B-Instruct" in out
+
+
 def test_cli_rejects_unknown_task(capsys):
     rc = cli.main(["calibrate-code", "--candidate", "claude", "--references", "openai", "--task", "nope"])
     assert rc == 1

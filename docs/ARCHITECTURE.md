@@ -302,63 +302,65 @@ paraphrase bleach and the active test spend a model request, and the two are opt
 ```
 src/bleachmark/
   __init__.py          package API surface
-  cli.py               detect, bleach, report subcommands
+  cli.py               detect, bleach, report, calibrate-code, calibrate-prose, hardware
   model.py             shared data model: Finding, Score, Report
   decode.py            UTF-8 to codepoint decode with offsets
   detect/
     __init__.py        detector interface and registry
-    carriers/
-      zerowidth.py     zero-width and format characters
-      tags.py          Unicode Tags block, ASCII smuggling
-      selectors.py     variation-selector runs
-      homoglyph.py     confusable and mixed-script test
-      whitespace.py    whitespace and typographic carriers
-      markdown.py      Markdown-specific carriers
-      bidi.py          bidirectional override characters
-      context.py       exoneration by script, base, position
+    carriers/          the seven carrier detectors and the context exoneration
     statistical/
       scorer.py        pluggable machine-generation scorers
-      corpus.py        corpus-level estimator (SCALE)
     comparison.py      cross-run and cross-model inference
-    code.py            constrained repeated-generation probe for code
+    code.py            constrained code probe, AST canonicalization, structural_normalize
+    code_c.py          lexical canonicalizer for C
+    features.py        code to a (slot, variant) matrix, by reference alignment
+    partition_test.py  steal-and-test partition z-test, slot-permutation null
+    calibrate.py       calibrated style baseline, a gap to a false-positive rate
+    prose.py           keyless prose detection by the green-list context, and calibrate
     context_keyed.py   context-keyed signature, watermark against style
     attribution.py     multi-bit user-attribution estimate
-    neural/
-      __init__.py      neural detector interface
-      llm.py           LLM-based detector
-      slm.py           SLM-based detector
-      net.py           neural-net detector
+    neural/            neural detector interface (model-equipped)
     keyed/
-      greenlist.py     green-list z-test
+      greenlist.py     green-list z-test (Kirchenbauer, arXiv:2301.10226)
+      windowed.py      context variants: unigram, window, SelfHash (arXiv:2306.04634)
       synthid.py       SynthID-Text detector
       active.py        black-box watermark-presence test
   bleach/
     __init__.py        bleach interface and strength ladder
     normalize.py       carrier removal, lowest strength
     tokens.py          token-level edits, middle strength
-    paraphrase.py      semantic paraphrase, highest strength
     neural.py          model-based bleach
     attribution.py     defeat a user-attribution mark
-    translate.py       round-trip translation (SCALE)
-    gate.py            meaning-preservation gate
+    gate.py            meaning-preservation gate (token similarity)
+    live.py            live bleach, compile-and-test meaning gate, calibration runs
+    reorder.py         the reverse-order bleach for prose
+    strategies.py      the bleach-strategy library (reorder and transcode families)
+    transcode.py       the deterministic transcode translator (reversed-word)
   report/
     json_emit.py       canonical JSON report
     markdown_emit.py   Markdown report from the JSON model
+    calibration_emit.py the calibrated finding as Markdown or JSON
   data/
     codepoints/        codepoint set data files
   runtime/
     model.py           the one model gateway, sanitize before every call
-    accel.py           NPU or GPU acceleration
-    providers.py       provider adapters, a real model as a callable
+    accel.py           accelerator kind: cuda, npu, metal, cpu
+    hardware.py        detect the GPU, video memory, CUDA, CPU, RAM
+    models.py          model registry and video-memory-aware selection
+    local_llama.py     download a GGUF and run it with llama.cpp (optional group)
+    providers.py       provider adapters and the configurable local endpoint
   harness/
-    __init__.py        effectiveness harness
     generators.py      reference watermark generators and test keys
     measure.py         attack the samples and measure the rates
   evolve/
-    __init__.py        evolution API surface
     arena.py           known stego embedder and the estimating detector
     evolution.py       the prompt and detector genomes and the loop
     realbridge.py      evolve a constraint prompt against a provider model
+    coevolve.py        joint defense/detection co-evolution, meaning-floor gate
+    bleachevolve.py    the bleach co-evolution, watermark removal with a meaning gate
+    bleachstrategy.py  the bleach-strategy evolution, degradation against fidelity
+    watermark_game.py  watermark-context vs bleach, minimax and fictitious play
+    tranche.py         the code tranche driver, synthetic rounds and a model run
 tests/
   fixtures/            watermarked, clean, and legitimate-use corpora
 benchmark/             larger scheme benchmark (SCALE)

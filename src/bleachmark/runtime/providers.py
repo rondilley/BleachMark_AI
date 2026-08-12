@@ -67,7 +67,37 @@ def _post(url: str, headers: dict, body: dict, timeout: int = 60) -> dict:
         raise RuntimeError(f"{url} HTTP {exc.code}: {detail}")
 
 
-def _openai_compatible(cfg: ModelConfig, base_url: str, token_field: str = "max_tokens") -> Callable[[str], str]:
+def _get(url: str, timeout: int = 15) -> dict:
+    req = urllib.request.Request(url, method="GET")
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        return json.loads(resp.read().decode("utf-8"))
+
+
+def local_base_url(base_url: str | None = None) -> str:
+    """Resolve the local OpenAI-compatible base URL.
+
+    Order: an explicit argument, then the BLEACHMARK_LOCAL_URL environment variable, then the
+    default. The operator points BLEACHMARK_LOCAL_URL at a local engine, for example
+    http://tars.uberadmin.com:5150/v1, and every local call uses it.
+    """
+    return base_url or os.environ.get("BLEACHMARK_LOCAL_URL") or _OPENAI_COMPAT["local"]
+
+
+def list_local_models(base_url: str | None = None) -> list[str]:
+    """Query the local engine for the model ids it serves (GET /v1/models)."""
+    url = local_base_url(base_url).rstrip("/") + "/models"
+    data = _get(url)
+    items = data.get("data") or data.get("models") or []
+    ids = []
+    for it in items:
+        mid = it.get("id") or it.get("name") or it.get("model")
+        if mid:
+            ids.append(mid)
+    return ids
+
+
+def _openai_compatible(cfg: ModelConfig, base_url: str, token_field: str = "max_tokens",
+                       timeout: int = 60) -> Callable[[str], str]:
     def call(prompt: str) -> str:
         body = {
             "model": cfg.model,
@@ -76,7 +106,7 @@ def _openai_compatible(cfg: ModelConfig, base_url: str, token_field: str = "max_
             token_field: cfg.max_tokens,
         }
         headers = {"Authorization": f"Bearer {cfg.api_key}", "Content-Type": "application/json"}
-        out = _post(f"{base_url}/chat/completions", headers, body)
+        out = _post(f"{base_url}/chat/completions", headers, body, timeout=timeout)
         return out["choices"][0]["message"]["content"] or ""
 
     return call
@@ -128,10 +158,29 @@ def make_model(
     root: str = ".",
     temperature: float = 1.0,
     max_tokens: int = 512,
+    base_url: str | None = None,
 ) -> Callable[[str], str]:
-    """Build a callable(prompt)->text for a real provider (FR-37, IR-01)."""
+    """Build a callable(prompt)->text for a real provider (FR-37, IR-01).
+
+    For the local provider the base URL is configurable (base_url, then BLEACHMARK_LOCAL_URL),
+    so it can point at a local engine such as tars.uberadmin.com:5150. When no model is named,
+    the tool asks the local engine for the model it serves.
+    """
     provider = provider.lower()
-    api_key = "" if provider == "local" else read_key(provider, root)
+    if provider == "local":
+        url = local_base_url(base_url)
+        chosen = model
+        if not chosen or chosen == DEFAULT_MODELS["local"]:
+            try:
+                served = list_local_models(url)
+                chosen = served[0] if served else DEFAULT_MODELS["local"]
+            except Exception:
+                chosen = model or DEFAULT_MODELS["local"]
+        cfg = ModelConfig("local", chosen, "", temperature, max_tokens)
+        # a local model can be large and slow, so allow a long timeout (env-overridable)
+        timeout = int(os.environ.get("BLEACHMARK_LOCAL_TIMEOUT", "600"))
+        return _openai_compatible(cfg, url, token_field="max_tokens", timeout=timeout)
+    api_key = read_key(provider, root)
     cfg = ModelConfig(provider, model or DEFAULT_MODELS.get(provider, provider), api_key,
                       temperature, max_tokens)
     if provider == "claude":

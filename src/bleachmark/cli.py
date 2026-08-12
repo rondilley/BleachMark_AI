@@ -7,6 +7,7 @@ machine-generation score never drives the exit code (FR-36).
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 
 from . import detect_carriers
@@ -127,6 +128,75 @@ def _cmd_calibrate_prose(args) -> int:
     return 0 if result.get("ok") else 1
 
 
+def _hardware_report(root: str = ".") -> dict:
+    from .runtime.hardware import detect_hardware
+    from .runtime.models import recommend
+    from .runtime.providers import local_base_url, list_local_models
+
+    prof = detect_hardware()
+    best = prof.best_gpu()
+    budget = best.vram_total_mb if best else 0
+    rec = recommend(budget) if budget else {}
+    url = local_base_url()
+    served, reachable, err = [], False, ""
+    try:
+        served = list_local_models(url)
+        reachable = True
+    except Exception as exc:
+        err = type(exc).__name__
+    return {
+        "hardware": prof.summary(),
+        "endpoint": {"url": url, "reachable": reachable, "served_models": served, "error": err},
+        "recommended": {
+            fn: {
+                "model": s.model.name if s.model else None,
+                "fits": s.fits,
+                "vram_mb": s.model.vram_mb() if s.model else None,
+                "hf_repo": s.model.hf_repo if s.model else None,
+                "note": s.note,
+            } for fn, s in rec.items()
+        },
+    }
+
+
+def _hardware_markdown(r: dict) -> str:
+    hw = r["hardware"]
+    gpu = hw["gpu"]
+    ep = r["endpoint"]
+    lines = ["# BleachMark local inference", ""]
+    lines.append("## Detected hardware")
+    lines.append(f"- Accelerator: {hw['accelerator']}")
+    if gpu:
+        lines.append(f"- GPU: {gpu['name']} ({gpu['vram_total_mb']} MB total, "
+                     f"{gpu['vram_free_mb']} MB free), driver {gpu['driver']}, CUDA {hw['cuda_version']}")
+    else:
+        lines.append("- GPU: none detected")
+    lines.append(f"- CPU cores: {hw['cpu_count']}")
+    lines.append(f"- RAM: {hw['ram_mb']} MB")
+    lines.append("")
+    lines.append("## Local inference engine")
+    lines.append(f"- Endpoint: {ep['url']}")
+    lines.append(f"- Reachable: {'yes' if ep['reachable'] else 'no' + (' (' + ep['error'] + ')' if ep['error'] else '')}")
+    if ep["served_models"]:
+        lines.append(f"- Served models: {', '.join(ep['served_models'])}")
+    lines.append("")
+    lines.append(f"## Recommended local models (video-memory budget {hw['total_vram_mb']} MB, estimate)")
+    lines.append("")
+    lines.append("| Function | Model | Fits | Est. VRAM | Hugging Face repo |")
+    lines.append("| --- | --- | --- | --- | --- |")
+    for fn, s in r["recommended"].items():
+        lines.append(f"| {fn} | {s['model']} | {'yes' if s['fits'] else 'no'} | "
+                     f"{s['vram_mb']} MB | {s['hf_repo']} |")
+    return "\n".join(lines)
+
+
+def _cmd_hardware(args) -> int:
+    """Detect the host hardware, check the local engine, and recommend local models."""
+    report = _hardware_report(root=args.root)
+    print(json.dumps(report, indent=2) if args.json else _hardware_markdown(report))
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="bleachmark", description=__doc__)
     sub = p.add_subparsers(dest="command", required=True)
@@ -171,6 +241,12 @@ def build_parser() -> argparse.ArgumentParser:
     cp.add_argument("--root", default=".", help="root that holds <provider>.key.txt")
     cp.add_argument("--json", action="store_true", help="emit the JSON calibration report")
     cp.set_defaults(func=_cmd_calibrate_prose)
+
+    hw = sub.add_parser("hardware",
+                        help="detect the host hardware, check the local engine, recommend local models")
+    hw.add_argument("--json", action="store_true", help="emit the JSON hardware report")
+    hw.add_argument("--root", default=".", help="root that holds <provider>.key.txt")
+    hw.set_defaults(func=_cmd_hardware)
     return p
 
 
