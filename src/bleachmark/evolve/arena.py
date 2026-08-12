@@ -64,6 +64,27 @@ class StructuralArena:
         weights = [style ** (-v) for v in range(k)]  # key-independent style prior
         return [_weighted_index(rng, weights) for _ in range(n_slots)]
 
+    def styled_control(
+        self, k: int, n_slots: int, seed: int, style: float = 6.0, style_key: str = "style-not-wm"
+    ) -> list[int]:
+        """A key-INDEPENDENT but slot-SPECIFIC style: each slot has its own favored
+        variant, fixed by a style key that is not the watermark key.
+
+        This models real code style, where a model prefers a different construct at each
+        structural position. It carries no watermark. It exists to show the limit of the
+        steal-and-test partition z-test: slot-specific style produces the same
+        permutation gap as a keyed watermark, so the two are not separable keyless.
+        """
+        rng = random.Random(seed)
+        out = []
+        for s in range(n_slots):
+            favored = int.from_bytes(
+                hashlib.sha256(f"{style_key}|{s}".encode()).digest()[:4], "big"
+            ) % k
+            weights = [style if v == favored else 1.0 for v in range(k)]
+            out.append(_weighted_index(rng, weights))
+        return out
+
 
 @dataclass
 class EstimatingDetector:

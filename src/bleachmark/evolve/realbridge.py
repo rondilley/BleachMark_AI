@@ -30,6 +30,13 @@ TASKS = [
     "return the maximum value in a list",
 ]
 
+TASKS_C = [
+    "check whether an integer is prime",
+    "return the nth Fibonacci number",
+    "compute the greatest common divisor of two integers",
+    "return the maximum value in an int array",
+]
+
 
 @dataclass
 class RealPromptGenome:
@@ -39,7 +46,11 @@ class RealPromptGenome:
     no_comments: bool = True        # forbid comments and docstrings
     temperature: float = 1.0        # sampling temperature
     n_runs: int = 3                 # samples per task
-    n_tasks: int = 2                # tasks used from TASKS
+    n_tasks: int = 2                # tasks used from the suite
+    lang: str = "python"            # "python" or "c"
+
+    def tasks(self) -> list[str]:
+        return TASKS_C if self.lang == "c" else TASKS
 
     def mutate(self, rng: random.Random) -> "RealPromptGenome":
         g = RealPromptGenome(**self.__dict__)
@@ -55,16 +66,24 @@ class RealPromptGenome:
         return g
 
     def compile_prompt(self, task: str) -> str:
-        parts = [f"Write a Python function for: {task}."]
+        if self.lang == "c":
+            parts = [f"Write a C function for: {task}."]
+            sig = "int f(int x)"
+        else:
+            parts = [f"Write a Python function for: {task}."]
+            sig = "def f(x)"
         if self.fix_names:
-            parts.append("Use exactly this signature: def f(x). Name every local a, b, c.")
+            parts.append(f"Use exactly this signature: {sig}. Name every local a, b, c.")
         if self.fix_structure:
             parts.append("Use a single loop and a single return. Do not use a helper.")
         if self.iterative_only:
             parts.append("Iterative only, no recursion.")
         if self.no_comments:
             parts.append("No comments, no docstring, no prose.")
-        parts.append("Return only the code.")
+        if self.lang == "c":
+            parts.append("Return only the code, no includes.")
+        else:
+            parts.append("Return only the code.")
         return " ".join(parts)
 
 
@@ -104,13 +123,13 @@ def real_fitness(
     cand_res: list[float] = []
     ctrl_res: list[float] = []
     corpus_words = 0
-    for task in TASKS[: genome.n_tasks]:
+    for task in genome.tasks()[: genome.n_tasks]:
         prompt = genome.compile_prompt(task)
         cand = cache.samples(candidate_fn, candidate_id, prompt, genome.n_runs)
         ctrl = cache.samples(control_fn, control_id, prompt, genome.n_runs)
         corpus_words += sum(len(s.split()) for s in cand)
-        cand_res.append(_residual_variability(cand))
-        ctrl_res.append(_residual_variability(ctrl))
+        cand_res.append(_residual_variability(cand, genome.lang))
+        ctrl_res.append(_residual_variability(ctrl, genome.lang))
     cr = statistics.mean(cand_res)
     xr = statistics.mean(ctrl_res)
     # reward exposing the candidate structure, penalize generic looseness that also
@@ -136,11 +155,12 @@ def evolve_real(
     generations: int = 3,
     pop_size: int = 4,
     seed: int = 0,
+    lang: str = "python",
 ) -> RealEvolutionResult:
     """Evolve a constraint prompt against a live candidate and control model."""
     rng = random.Random(seed)
     cache = ModelCache()
-    population = [RealPromptGenome().mutate(rng) for _ in range(pop_size)]
+    population = [RealPromptGenome(lang=lang).mutate(rng) for _ in range(pop_size)]
     history: list[float] = []
     best: RealPromptGenome | None = None
     best_eval: RealEvaluation | None = None

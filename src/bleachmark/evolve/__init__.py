@@ -16,6 +16,22 @@ strategy is a constraint template that then transfers to a real model.
 from .arena import StructuralArena, EstimatingDetector
 from .evolution import PromptGenome, DetectorGenome, evolve, evaluate, random_individual
 from .realbridge import RealPromptGenome, ModelCache, real_fitness, evolve_real
+from .coevolve import (
+    CodeModality,
+    DefensePrompt,
+    oracle_capacity,
+    detection_eval,
+    coevolve,
+    CoEvolutionResult,
+)
+from .bleachevolve import (
+    BleachArena,
+    BleachPolicy,
+    evaluate_bleach,
+    evolve_bleach,
+    BleachEval,
+    BleachResult,
+)
 
 __all__ = [
     "StructuralArena",
@@ -30,4 +46,18 @@ __all__ = [
     "ModelCache",
     "real_fitness",
     "evolve_real",
+    # the joint defense/detection co-evolution (the code tranche)
+    "CodeModality",
+    "DefensePrompt",
+    "oracle_capacity",
+    "detection_eval",
+    "coevolve",
+    "CoEvolutionResult",
+    # the bleach co-evolution (watermark removal with a meaning gate)
+    "BleachArena",
+    "BleachPolicy",
+    "evaluate_bleach",
+    "evolve_bleach",
+    "BleachEval",
+    "BleachResult",
 ]

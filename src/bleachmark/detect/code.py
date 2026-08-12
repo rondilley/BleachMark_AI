@@ -25,6 +25,8 @@ from collections import Counter
 from dataclasses import dataclass, field
 from typing import Callable
 
+from .code_c import canonicalize_c
+
 _TOKEN = re.compile(r"\w+|[^\w\s]", re.UNICODE)
 _CODE_FENCE = re.compile(r"```[a-zA-Z]*\n?|```")
 
@@ -82,9 +84,79 @@ def canonicalize(code: str) -> str:
         return re.sub(r"\s+", " ", no_comments).strip()
 
 
-def _residual_variability(samples: list[str]) -> float:
+def canonicalize_for(lang: str, code: str) -> str:
+    """Dispatch canonicalization by language: python (AST) or c (lexical)."""
+    if lang == "c":
+        return canonicalize_c(_strip_fences(code))
+    return canonicalize(code)
+
+
+_COMMUTATIVE = (ast.Add, ast.Mult, ast.BitAnd, ast.BitOr, ast.BitXor)
+_CMP_FLIP = {ast.Lt: ast.Gt, ast.Gt: ast.Lt, ast.LtE: ast.GtE, ast.GtE: ast.LtE}
+
+
+class _StructuralNormalizer(ast.NodeTransformer):
+    """Collapse the semantics-preserving structural choices a watermark rides on.
+
+    It sorts the operands of a commutative operator, sorts the operands of a boolean
+    operator, and turns a comparison to one canonical direction. It keeps the
+    identifier names, so the result is still runnable code. It does not touch a
+    non-commutative operator, a chained comparison, or the statement order, because
+    those changes are not always meaning-preserving.
+    """
+
+    def visit_BinOp(self, node):
+        self.generic_visit(node)
+        if isinstance(node.op, _COMMUTATIVE):
+            if ast.unparse(node.left) > ast.unparse(node.right):
+                node.left, node.right = node.right, node.left
+        return node
+
+    def visit_BoolOp(self, node):
+        self.generic_visit(node)
+        node.values.sort(key=ast.unparse)
+        return node
+
+    def visit_Compare(self, node):
+        self.generic_visit(node)
+        if len(node.ops) != 1:
+            return node
+        op = node.ops[0]
+        left, right = node.left, node.comparators[0]
+        if type(op) in _CMP_FLIP:
+            # turn a > b into b < a, and a >= b into b <= a: one direction only
+            if isinstance(op, (ast.Gt, ast.GtE)):
+                node.left, node.comparators[0] = right, left
+                node.ops[0] = _CMP_FLIP[type(op)]()
+        elif isinstance(op, (ast.Eq, ast.NotEq)):
+            # == and != are commutative, so sort the operands
+            if ast.unparse(left) > ast.unparse(right):
+                node.left, node.comparators[0] = right, left
+        return node
+
+
+def structural_normalize(code: str) -> str:
+    """Return runnable code with the commutative and comparison-direction slots closed.
+
+    This is the deterministic corpus bleach. Two samples that differ only in operand
+    order or comparison direction collapse to one form, so the residual structural
+    channel closes without a model call. Samples that differ in a real way (a different
+    construct or algorithm) stay different. The names are kept, so the result runs.
+    Falls back to the input when the code does not parse.
+    """
+    code = _strip_fences(code)
+    try:
+        tree = ast.parse(code)
+        tree = _StructuralNormalizer().visit(tree)
+        ast.fix_missing_locations(tree)
+        return ast.unparse(tree)
+    except SyntaxError:
+        return code
+
+
+def _residual_variability(samples: list[str], lang: str = "python") -> float:
     """Mean pairwise token difference across the canonicalized samples."""
-    canon = [Counter(_TOKEN.findall(canonicalize(s))) for s in samples]
+    canon = [Counter(_TOKEN.findall(canonicalize_for(lang, s))) for s in samples]
     if len(canon) < 2:
         return 0.0
     total = 0.0
@@ -124,6 +196,33 @@ DEFAULT_SUITE = [
     "return the second largest value in a list",
 ]
 
+DEFAULT_SUITE_C = [
+    "the nth Fibonacci number, iterative",
+    "reverse a string in place",
+    "check whether an integer is prime",
+    "compute the factorial of n, iterative",
+    "return the maximum value in an int array",
+    "count vowels in a string",
+    "compute the greatest common divisor of a and b",
+    "check whether a string is a palindrome",
+    "sum the decimal digits of an integer",
+    "return the second largest value in an int array",
+]
+
+_PROMPT_PY = (
+    "Write a Python function for: {task}.\n"
+    "Use exactly this signature: def f(x). Rename every local to a, b, c. "
+    "Iterative only, no recursion, no comments, no docstring, no prose. "
+    "Return only the code."
+)
+
+_PROMPT_C = (
+    "Write a C function for: {task}.\n"
+    "Use exactly this signature: int f(int x). Name every local a, b, c. "
+    "Iterative only, no recursion, no comments, no prose. "
+    "Return only the code, no includes."
+)
+
 
 def suite_probe(
     candidate_fn: Callable[[str], str],
@@ -132,31 +231,30 @@ def suite_probe(
     runs: int = 6,
     excess_threshold: float = 0.02,
     min_words: int = 400,
+    lang: str = "python",
 ) -> CodeProbeResult:
     """Run the constrained, canonicalized probe over a suite of functions.
 
     For each task the model writes the function `runs` times under a naming and
     structure constraint. The probe canonicalizes each output and measures the
     residual variability of the candidate against the control. It aggregates the
-    corpus word count to confirm the 400-to-800-word band.
+    corpus word count to confirm the 400-to-800-word band. `lang` selects the
+    Python AST canonicalizer or the C lexical canonicalizer.
     """
-    tasks = tasks or DEFAULT_SUITE
+    if tasks is None:
+        tasks = DEFAULT_SUITE_C if lang == "c" else DEFAULT_SUITE
+    template = _PROMPT_C if lang == "c" else _PROMPT_PY
     cand_res: list[float] = []
     ctrl_res: list[float] = []
     per_task: list[dict] = []
     corpus_words = 0
     for task in tasks:
-        prompt = (
-            f"Write a Python function for: {task}.\n"
-            "Use exactly this signature: def f(x). Rename every local to a, b, c. "
-            "Iterative only, no recursion, no comments, no docstring, no prose. "
-            "Return only the code."
-        )
+        prompt = template.format(task=task)
         cand = [candidate_fn(prompt) for _ in range(runs)]
         ctrl = [control_fn(prompt) for _ in range(runs)]
         corpus_words += sum(len(s.split()) for s in cand)
-        cr = _residual_variability(cand)
-        xr = _residual_variability(ctrl)
+        cr = _residual_variability(cand, lang)
+        xr = _residual_variability(ctrl, lang)
         cand_res.append(cr)
         ctrl_res.append(xr)
         per_task.append({"task": task, "candidate_residual": cr, "control_residual": xr})
@@ -188,7 +286,8 @@ def constrained_probe(
     constraint: str = "Use exactly these names: def solve(a, b). Return one statement.",
     runs: int = 10,
     excess_threshold: float = 0.05,
+    lang: str = "python",
 ) -> CodeProbeResult:
     """A single-task probe, kept for a quick check. Prefer suite_probe for power."""
     return suite_probe(candidate_fn, control_fn, tasks=[task], runs=runs,
-                       excess_threshold=excess_threshold, min_words=0)
+                       excess_threshold=excess_threshold, min_words=0, lang=lang)
