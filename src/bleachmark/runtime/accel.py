@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import sys
 from dataclasses import dataclass
 
 
@@ -26,6 +27,6 @@ def select_accelerator() -> Accelerator:
         return Accelerator("npu", "env hint")
     if shutil.which("nvidia-smi"):
         return Accelerator("cuda", "nvidia-smi present")
-    if os.uname().sysname == "Darwin" if hasattr(os, "uname") else False:
+    if sys.platform == "darwin":
         return Accelerator("metal", "apple platform")
     return Accelerator("cpu", "fallback, no accelerator found")

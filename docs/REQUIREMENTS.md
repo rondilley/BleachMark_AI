@@ -73,22 +73,10 @@ tool does not cover image, audio, or video steganography.
   script, base character, and position before it flags the carrier. Justification:
   false-positive traps (research §7.7).
 
-### 1.3 Keyless statistical detection
+### 1.3 Keyless corpus watermark estimation
 
-- **FR-13** (MVP) The tool MUST score text for machine-generation likelihood with
-  a zero-shot statistical method. This score is not watermark identification.
-  Justification: a keyless MGT score, and the two tasks must not mix (research §5).
-  <!-- AI review 20260810-234903: xai, claude -->
-- **FR-13a** (MVP) The report and the CLI MUST tell the user that the score is not
-  a verdict and not watermark identification. Justification: the two tasks must not
-  mix (research §5).
-- **FR-14** (MVP) The tool MUST report each score with a stated false-positive
-  rate. Justification: the base-rate problem (research §5).
-- **FR-15** (MVP) The tool MUST NOT give a yes-or-no "AI-written" verdict from a
-  perplexity heuristic alone. Justification: non-native bias at 61 percent
-  false-positive rate (research §5).
-- **FR-16** (MVP) The tool MUST attach a confound note to a low-perplexity result.
-  Justification: non-native writers get an incorrect flag (research §5).
+<!-- FR-13, FR-13a, FR-14, FR-15, FR-16 removed 20260812 (see VIBE_HISTORY). -->
+
 - **FR-17** (SCALE) The tool SHOULD estimate green-list bias on a corpus.
   Justification: corpus-level watermark-presence estimation (research §5).
 
@@ -157,11 +145,11 @@ tool does not cover image, audio, or video steganography.
 - **FR-35** (MVP) The library MUST give a clean API for detect and bleach.
   Justification: the library is a first-class deliverable.
 - **FR-36** (MVP) The CLI MUST give a non-zero exit code when it finds a
-  high-confidence carrier. The machine-generation score MUST NOT drive the exit
+  high-confidence carrier. A calibrated statistical rate MUST NOT drive the exit
   code. Justification: a pipeline gate on a deterministic result only.
   <!-- AI review 20260810-234903: claude -->
 
-### 1.8 Model-equipped detection, neural methods, and attribution
+### 1.8 Model-equipped detection and attribution
 
 <!-- reframe 20260811: Ron -->
 
@@ -179,12 +167,9 @@ tool does not cover image, audio, or video steganography.
   Justification: a blind bleach is honest with Bet 1 and the undetectability limit
   (research §4, §5).
   <!-- AI review 20260811-003657: claude -->
-- **FR-41** (MVP) The tool MUST give neural detectors that use an LLM, an SLM, or a
-  neural net, in addition to the statistical heuristics. The harness measures how much
-  a neural detector adds above a statistical scorer. Justification: neural methods
-  are a first-class detection lever, and the tool must measure the gain (goal.md
-  reframe).
-  <!-- AI review 20260811-003657: claude, openai -->
+
+<!-- FR-41 removed 20260812 (see VIBE_HISTORY). -->
+
 - **FR-42** (MVP) The tool MUST give model-based bleaching in addition to
   deterministic bleaching. Justification: model-based methods are a first-class
   bleach lever (goal.md reframe).

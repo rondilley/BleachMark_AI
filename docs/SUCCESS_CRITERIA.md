@@ -38,8 +38,7 @@ tags are MVP (v0.1), SCALE (v0.2 and later), and VNEXT (future).
   multilingual text.
 - **TC-03** (MVP) The tool detects a homoglyph substitution with a mixed-script
   test for each word. The tool does not flag a single-script word.
-- **TC-04** (MVP) The keyless MGT score reports a true-positive rate at a stated
-  false-positive rate of 1 percent. The tool shows the two numbers.
+<!-- TC-04 removed 20260812 (see VIBE_HISTORY). -->
 - **TC-05** (MVP) The keyed green-list z-test gives the same z-score as the
   reference method for a given key and tokenizer. The two numbers are equal to three
   decimal digits.
@@ -79,7 +78,7 @@ tags are MVP (v0.1), SCALE (v0.2 and later), and VNEXT (future).
 - **TC-17** (MVP) A new carrier connects as a module with no change to the core.
   A test adds a sample module.
 
-### 2.5 Model-equipped, attribution, and neural methods
+### 2.5 Model-equipped detection and attribution
 
 <!-- reframe 20260811: Ron -->
 
@@ -95,8 +94,7 @@ limit (research §5).
   payload gives no signal.
 - **TC-20** (MVP) The harness reports the drop in recovered attribution bits after
   the blind bleach. The bleach keeps the meaning in the human-paraphrase band.
-- **TC-21** (MVP) A neural detector reports a score and a false-positive rate on
-  the fixture corpus. The tool records the model and the parameters.
+<!-- TC-21 removed 20260812 (see VIBE_HISTORY). -->
 - **TC-22** (MVP) The effectiveness harness reports the detection rate and the
   bleach rate for each stego method. A run makes the samples and measures the two
   rates.
@@ -132,7 +130,6 @@ limit (research §5).
 | TC-01 | Carrier detection test | Watermarked fixture corpus | 100 percent true-positive | Each build |
 | TC-02 | Legitimate-use test | Emoji, RTL, multilingual fixtures | 1 percent maximum false-positive | Each build |
 | TC-03 | Mixed-script test | Homoglyph and native-script fixtures | No single-script flag | Each build |
-| TC-04 | MGT score test | MGT benchmark set | True-positive at 1 percent false-positive | Each build |
 | TC-05 | Keyed z-test parity | Reference key and tokenizer | Equal to three decimals | Each build |
 | TC-06 | SynthID detection test | SynthID configuration and samples | Score and rate given | Each build |
 | TC-07 | Carrier removal test | Watermarked fixture corpus | No carrier after bleach | Each build |

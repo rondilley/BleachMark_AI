@@ -9,44 +9,24 @@ samples.
 import random
 
 from bleachmark.decode import decode
-from bleachmark.detect.statistical.scorer import MgtScorer, length_confidence, ATTRIBUTION_WORDS
+from bleachmark.detect.length import length_confidence, ATTRIBUTION_WORDS
 from bleachmark.detect.comparison import compare_models
 from bleachmark.detect.code import constrained_probe
 from bleachmark.detect.attribution import MultiBitScheme, bit_accuracy
 from bleachmark.bleach.attribution import blind_token_bleach
-from bleachmark.detect.neural import NeuralDetector
 from bleachmark.detect.keyed.synthid import SynthIDScheme, SynthIDDetector
 from bleachmark.detect.keyed.active import active_presence_test
 from bleachmark.runtime.model import ModelGateway
 from bleachmark.harness import generators
 
 
-# ---- Slice 3: statistical scorer + length-aware confidence ----------------
+# ---- length-aware detection confidence (FR-49, FR-50) ---------------------
 
 def test_length_confidence():
     assert length_confidence(0) == 0.0
     assert length_confidence(ATTRIBUTION_WORDS // 2) == 0.5
     assert length_confidence(ATTRIBUTION_WORDS) == 1.0
     assert length_confidence(ATTRIBUTION_WORDS * 2) == 1.0
-
-
-def test_scorer_repetitive_scores_higher():
-    scorer = MgtScorer()
-    repetitive = "the the the same same same word word word " * 10
-    varied = (
-        "A curious fox wandered through misty hills while distant thunder rolled "
-        "over quiet valleys and travellers hurried homeward before nightfall."
-    )
-    assert scorer.score(repetitive) > scorer.score(varied)
-
-
-def test_scorer_finding_is_not_a_verdict_and_length_aware():
-    scorer = MgtScorer()
-    finding = scorer.detect(decode("short text here"))[0]
-    assert finding.false_positive_rate is not None
-    assert any("not a verdict" in n for n in finding.notes)
-    assert finding.confidence < 1.0  # short text is low confidence
-    assert any("below" in n for n in finding.notes)
 
 
 # ---- Slice 4: comparison detector -----------------------------------------
@@ -195,15 +175,6 @@ def test_blind_bleach_lowers_attribution():
     bleached = blind_token_bleach(tokens, vocab, fraction=0.6, seed=9)
     after = bit_accuracy(message, scheme.estimate(bleached))
     assert after < before
-
-
-# ---- Slice 8: neural detector ---------------------------------------------
-
-def test_neural_detector_reports_score():
-    det = NeuralDetector(score_fn=lambda t: 0.73, model_name="fake-slm")
-    finding = det.detect(decode("some text"))[0]
-    assert finding.score == 0.73
-    assert finding.false_positive_rate is not None
 
 
 # ---- Slice 9: SynthID + active test ---------------------------------------

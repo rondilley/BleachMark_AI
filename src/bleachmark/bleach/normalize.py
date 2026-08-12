@@ -35,12 +35,16 @@ def _strip_carriers(text: str) -> str:
     out: list[str] = []
     i = 0
     n = len(text)
+    # document-global decisions, computed once (not per character)
+    flag_indices = context.subdivision_flag_indices(text)
+    has_rtl = context.contains_rtl(text)
+    typographic_ok = context.typographic_density_exonerates(text)
     while i < n:
         ch = text[i]
         cp = ord(ch)
         # tag-block characters, unless a subdivision flag
         if 0xE0000 <= cp <= 0xE007F:
-            if context.in_subdivision_flag(text, i):
+            if i in flag_indices:
                 out.append(ch)
             i += 1
             continue
@@ -50,7 +54,7 @@ def _strip_carriers(text: str) -> str:
             continue
         # zero-width and format characters, unless exonerated
         if unicodedata.category(ch) == "Cf":
-            if context.exonerate_zero_width(text, i):
+            if context.exonerate_zero_width(text, i, has_rtl):
                 out.append(ch)
             i += 1
             continue
@@ -65,7 +69,7 @@ def _strip_carriers(text: str) -> str:
             continue
         # substituted Unicode space characters become a normal space
         if cp != 0x20 and cp != 0x09 and (0x2000 <= cp <= 0x200A or cp in (0xA0, 0x2007, 0x202F)):
-            if context.exonerate_typographic_space(text, i):
+            if typographic_ok:
                 out.append(ch)
             else:
                 out.append(" ")

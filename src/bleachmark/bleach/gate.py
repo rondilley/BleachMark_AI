@@ -28,6 +28,18 @@ def _cosine(a: Counter, b: Counter) -> float:
     return num / (da * db)
 
 
+def _dense_cosine(a: list[float], b: list[float]) -> float:
+    """Cosine similarity of two dense embedding vectors."""
+    if not a or not b or len(a) != len(b):
+        return 0.0
+    num = sum(x * y for x, y in zip(a, b))
+    da = math.sqrt(sum(x * x for x in a))
+    db = math.sqrt(sum(y * y for y in b))
+    if da == 0 or db == 0:
+        return 0.0
+    return num / (da * db)
+
+
 def _word_ngrams(text: str, n: int = 2) -> Counter:
     words = _WORD.findall(text.lower())
     grams = list(words)
@@ -48,9 +60,7 @@ class MeaningGate:
 
     def similarity(self, before: str, after: str, language: str = "en") -> float:
         if self.embedding is not None:
-            va = self.embedding(before)
-            vb = self.embedding(after)
-            return _cosine(Counter(enumerate(va)), Counter(enumerate(vb)))
+            return _dense_cosine(self.embedding(before), self.embedding(after))
         # A character n-gram cosine is robust to a small meaning-preserving edit
         # (a contraction, a punctuation swap) and still drops for a destructive
         # change. The English word-band P-SP metric is the documented upgrade.

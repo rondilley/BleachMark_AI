@@ -29,7 +29,7 @@ flowchart TD
   BLE[Bleach]
   CAR[Carrier engine codepoint plus context]
   STAT[Statistical engine keyless and model-equipped]
-  CMP[Comparison and neural detectors]
+  CMP[Comparison detectors]
   KEY[Keyed and active engine green-list and SynthID]
   NORM[Normalize carriers no model]
   TOK[Token-level edits]
@@ -56,17 +56,16 @@ watermark key, but it has the source model and comparison models. It uses
 comparison across runs and models to find a possible watermark. The keyed modules
 wait for keys.
 
-The tool gives a false-positive rate for each score. The tool does not give a
-yes-or-no "AI-written" verdict from a statistical score alone.
+The tool reports a calibrated false-positive rate for each detection score. Its
+input is model output by definition, so it does not classify text as AI-written.
 
 ## Runtime
 
 | Part | Dependency | Network |
 | --- | --- | --- |
 | Carrier detect and bleach | Core, no model | None |
-| Statistical score | Core | None |
 | Keyless corpus detection and calibrated rate | Core | A model request for the corpus |
-| Neural and model-based methods | Optional install group | Local model or opt-in API |
+| Model-based bleach | Optional install group | Local model or opt-in API |
 | Keyed z-test and SynthID | Optional install group, plus a key | None |
 | Local inference (llama.cpp) | Optional install group | Local model only |
 | Local engine on the OpenAI API | Core (urllib) | Local engine only |
@@ -102,7 +101,7 @@ bleachmark calibrate-prose --candidate claude --references local --samples 16
 - Version: v0.1 built, plus a 2026-08 research tranche on code and prose. The source
   tree is in `src/bleachmark/`. The test suite has 172 tests and passes.
 - The core detect and carrier-bleach paths use no model and make no network call. The
-  neural, keyed, and local-inference paths use an optional model or key.
+  keyed and local-inference paths use an optional model or key.
 
 ### Detection
 

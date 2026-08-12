@@ -50,7 +50,7 @@ class Finding:
     carries a calibrated score plus a stated false-positive rate (FR-14).
     """
 
-    kind: str  # e.g. "zero_width", "tags_block", "homoglyph", "mgt_score"
+    kind: str  # e.g. "zero_width", "tags_block", "homoglyph", "greenlist_ztest"
     detector: str
     severity: Severity
     summary: str
@@ -96,7 +96,7 @@ class Report:
             if f.posture == Posture.KEYLESS
             and f.severity in (Severity.HIGH, Severity.MEDIUM)
             and f.kind
-            not in ("mgt_score", "comparison", "neural", "attribution")
+            not in ("comparison", "attribution")
         ]
 
     def to_dict(self, show_payload: bool = False) -> dict[str, Any]:

@@ -42,13 +42,10 @@ def detect_carriers(text: str, target: str = "<text>") -> Report:
     )
 
 
-def detect(text: str, target: str = "<text>", scorer=None) -> Report:
-    """Full keyless detection: carriers plus an optional statistical scorer.
+def detect(text: str, target: str = "<text>") -> Report:
+    """Keyless carrier detection over the input text.
 
-    When a scorer is given it adds a calibrated machine-generation score. The score
-    is never a verdict and never watermark identification (FR-13a).
+    The input is assumed to be model output; the tool looks for hidden watermark and
+    carrier signals in it, not for whether the text is machine-written.
     """
-    report = detect_carriers(text, target)
-    if scorer is not None:
-        report.findings.extend(scorer.detect(decode(text)))
-    return report
+    return detect_carriers(text, target)

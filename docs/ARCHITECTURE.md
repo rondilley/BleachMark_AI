@@ -74,8 +74,8 @@ tokenizer, a configuration), and the active black-box test needs model queries.
 These are strong when the tool has them, but rare, so they must not stop the usual path.
 
 Keyless does not mean model-free. The tool is model-equipped. It uses the source
-model and comparison models for the comparison and neural methods (§9). The
-no-model carrier path is the baseline for a user without a model.
+model and comparison models for the comparison method (§9). The no-model carrier
+path is the baseline for a user without a model.
 
 How it could be incorrect. A user may think the keyless mode is as strong as the keyed
 mode. Mitigation: each result carries a posture label and a stated false-positive
@@ -150,22 +150,23 @@ for the bleach slices, not an open question.
 
 <!-- AI review 20260811-003657: gemini, claude -->
 
-## 7. Decision: keyless statistical detection uses pluggable scorers
+## 7. Decision: no per-document keyless watermark score
 
-Decision: the statistical engine holds pluggable machine-generation scorers of the
-Binoculars and Fast-DetectGPT class. It does not claim per-document watermark
-identification.
+Decision: the tool does not score a single document for a watermark on the keyless
+path, and it does not score a text as machine-generated. The keyless signal comes
+from cross-run and cross-model comparison (§9) and, at scale, a corpus-level
+green-list estimator.
 
 Alternative: claim keyless detection of a specified watermark in one document.
 
 Why this is correct. No published method does passive single-document keyless
-detection of a distortion-free or undetectable watermark, and theory says there
-may be none (research §5). The honest keyless result is a calibrated
-machine-generation score plus a corpus-level estimator. A pluggable structure lets the
-tool add a better scorer as the field improves.
+detection of a distortion-free or undetectable watermark, and theory says there may
+be none (research §5). The tool input is model output by definition, so a
+machine-generation score is not a question the tool must answer.
 
-How it could be incorrect. A scorer can hold a demographic bias (research §5).
-Mitigation: the engine attaches a confound note to a low-perplexity result and tells the false-positive rate (FR-15, FR-16).
+How it could be incorrect. A cross-model comparison can confuse model style with a
+watermark (research §5). Mitigation: the tool tells the limit and gives a calibrated
+false-positive rate for each result (AR-03, FR-38a).
 
 ## 8. Decision: keyed modules sit behind optional extras
 
@@ -182,36 +183,34 @@ requirement (FR-19), so the module ships in v0.1, but its dependency is optional
 How it could be incorrect. A user may want SynthID detection with no configuration.
 Mitigation: the module gives a clear message when the user gives no configuration.
 
-## 9. Decision: model-equipped detection, neural methods, and the harness
+## 9. Decision: model-equipped detection and the harness
 
 Decision: the tool has access to the source model and comparison models. It uses
-comparison and neural methods for detection and for bleaching. It estimates a
-user-attribution payload. It measures its own effectiveness.
+comparison for detection and a model-based bleach. It estimates a user-attribution
+payload. It measures its own effectiveness.
 
 Alternative: a passive tool with heuristics alone and no model access.
 
 Why this is correct. The realistic tool is model-equipped, not passive
 (goal.md reframe). With model access the tool runs a black-box watermark-presence test and a
 cross-run comparison, which are the strongest keyless methods (research §5). A
-neural detector and a model-based bleach add strength that a heuristic does not
-give. A watermark can attribute a text to a user, so the tool must estimate and
-defeat that payload (research §6).
+model-based bleach adds strength that a deterministic bleach does not give. A
+watermark can attribute a text to a user, so the tool must estimate and defeat that
+payload (research §6).
 
 The tool measures what works with an effectiveness harness. The harness makes
 watermarked samples, attacks them, and reports the detection rate and the bleach
 rate for each stego method. This is a research project, so measurement is a core
 function.
 
-How it could be incorrect. Model access and neural methods are heavy, and a
-comparison method can give an incorrect signal. Mitigation: the tool uses NPU or GPU
-acceleration when the host has it (FR-43). The tool gives a false-positive rate
-for each comparison result. The keyless heuristics run with no model, so a user
-without a model keeps a baseline.
+How it could be incorrect. Model access is heavy, and a comparison method can give
+an incorrect signal. Mitigation: the tool uses NPU or GPU acceleration when the host
+has it (FR-43). The tool gives a false-positive rate for each comparison result. The
+carrier detectors run with no model, so a user without a model keeps a baseline.
 
 The honest limit. A perfectly undetectable watermark stays undetectable. Model queries do not
-change that (research §5, Christ and others). Comparison and neural methods work
-against a deployed and leaky scheme, not against the ideal scheme. The tool tells
-this limit.
+change that (research §5, Christ and others). Comparison works against a deployed and
+leaky scheme, not against the ideal scheme. The tool tells this limit.
 
 The model gateway. Every model-bound path goes through one gateway in
 `runtime/model.py` (SR-09). The gateway runs the carrier normalization first and
@@ -219,10 +218,10 @@ stops the call on an error. This puts the SR-06 sequence at one
 choke-point, not at five call sites. The harness is the one audited special case. It sends a raw sample
 only in a sandbox, not to an API (SR-10).
 
-Investigative, not guaranteed. The comparison, the attribution estimate, and the
-neural detectors are investigative methods. The harness measures each one. The
-success is a measured rate, not a guaranteed detection. The attribution bleach
-runs blind, so it does not use the estimate (FR-40).
+Investigative, not guaranteed. The comparison and the attribution estimate are
+investigative methods. The harness measures each one. The success is a measured rate,
+not a guaranteed detection. The attribution bleach runs blind, so it does not use the
+estimate (FR-40).
 
 Source code is a strong comparison target. Code has a defined syntax and a small
 space of legitimate variation. The `detect/code.py` module tells a model to write
@@ -279,17 +278,15 @@ flag with a warning (SR-08).
 
 <!-- AI review 20260810-234903: gemini, claude -->
 
-**Report layer.** The report layer holds three homes for a MUST. A redaction filter
+**Report layer.** The report layer holds two homes for a MUST. A redaction filter
 in `report/` removes a key or a secret from each
-output stream (SR-03). The report
-tells the user that a machine-generation score is not a verdict and not watermark
-identification (FR-13a). The report does not claim to detect a vendor production
+output stream (SR-03). The report does not claim to detect a vendor production
 watermark without the vendor key (FR-19a).
 
 <!-- AI review 20260811-003657: claude, openai -->
 
 **Exit code.** The `cli.py` sets a non-zero exit code from a high-confidence
-carrier result only. A machine-generation score does not set the exit code
+carrier result only. A calibrated statistical rate does not set the exit code
 (FR-36).
 
 <!-- AI review 20260811-003657: gemini, claude, openai -->
@@ -308,8 +305,6 @@ src/bleachmark/
   detect/
     __init__.py        detector interface and registry
     carriers/          the seven carrier detectors and the context exoneration
-    statistical/
-      scorer.py        pluggable machine-generation scorers
     comparison.py      cross-run and cross-model inference
     code.py            constrained code probe, AST canonicalization, structural_normalize
     code_c.py          lexical canonicalizer for C
@@ -319,7 +314,7 @@ src/bleachmark/
     prose.py           keyless prose detection by the green-list context, and calibrate
     context_keyed.py   context-keyed signature, watermark against style
     attribution.py     multi-bit user-attribution estimate
-    neural/            neural detector interface (model-equipped)
+    length.py          length-aware detection confidence (attribution length)
     keyed/
       greenlist.py     green-list z-test (Kirchenbauer, arXiv:2301.10226)
       windowed.py      context variants: unigram, window, SelfHash (arXiv:2306.04634)
@@ -331,7 +326,8 @@ src/bleachmark/
     tokens.py          token-level edits, middle strength
     neural.py          model-based bleach
     attribution.py     defeat a user-attribution mark
-    gate.py            meaning-preservation gate (token similarity)
+    gate.py            meaning-preservation gate (token or embedding similarity)
+    meaning_calibrate.py the gate threshold from labeled paraphrase pairs
     live.py            live bleach, compile-and-test meaning gate, calibration runs
     reorder.py         the reverse-order bleach for prose
     strategies.py      the bleach-strategy library (reorder and transcode families)
@@ -352,6 +348,7 @@ src/bleachmark/
   harness/
     generators.py      reference watermark generators and test keys
     measure.py         attack the samples and measure the rates
+    throughput.py      carrier-scan throughput benchmark (>= 1 MB/s, NFR-01)
   evolve/
     arena.py           known stego embedder and the estimating detector
     evolution.py       the prompt and detector genomes and the loop
@@ -367,8 +364,8 @@ benchmark/             larger scheme benchmark (SCALE)
 ```
 
 The `detect/code.py` module holds the constrained probe with the AST
-canonicalization (Section 16). The `detect/neural/` and the `bleach/neural.py`
-modules take a model callable through the gateway.
+canonicalization (Section 16). The `bleach/neural.py` module takes a model callable
+through the gateway.
 
 ## 13. Data flow
 
@@ -384,11 +381,11 @@ sequenceDiagram
   U->>C: detect or bleach a text
   C->>D: decode UTF-8 to codepoints
   D->>DET: codepoints with offsets
-  DET->>DET: run carrier and statistical detectors
+  DET->>DET: run carrier detectors
   DET->>R: findings with score and false-positive rate
   C->>B: bleach at a selected strength
   B->>B: normalize carriers first
-  B->>G: paraphrase or neural call on clean text
+  B->>G: paraphrase call on clean text
   G->>G: sanitize check then call the model
   B->>B: run the meaning gate
   B->>R: before and after scores
@@ -399,9 +396,6 @@ sequenceDiagram
 
 - A legitimate-use carrier gives an incorrect flag. Surface: the legitimate-use
   fixture test. Recovery: the context rule in `detect/carriers/context.py`.
-- A low-perplexity human text gets a high machine-generation score. Surface: the
-  confound note and the stated false-positive rate. Recovery: no binary verdict
-  (FR-15).
 - The tool does not have the paraphrase model. Surface: a clear message at bleach time.
   Recovery: the two lower bleach strengths run.
 - A bleach removes the signal but changes the meaning. Surface: the meaning gate.
@@ -418,8 +412,7 @@ sequenceDiagram
 covers these parts:
 
 - All carrier detectors with context exoneration.
-- The keyless statistical scorer with a stated false-positive rate.
-- The comparison detector and the neural detectors.
+- The comparison detector with a stated false-positive rate.
 - The black-box watermark-presence test and the attribution estimate.
 - The three bleach strengths with the meaning gate.
 - The model-based bleach and the attribution bleach.
@@ -518,8 +511,6 @@ the tool reports an honest null, not an incorrect flag (FR-62).
 
 ## 18. Open questions
 
-- Which machine-generation scorer is the best default for the keyless path, given
-  the false-positive risk? A measured comparison must give the answer.
 - Which paraphrase model gives the cleanest bleach for each meaning cost on a local
   runtime? A benchmark must give the answer.
 - What is the correct meaning-gate threshold for a high-stakes text? The research

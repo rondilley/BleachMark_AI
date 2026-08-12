@@ -64,13 +64,18 @@ def _post(url: str, headers: dict, body: dict, timeout: int = 60) -> dict:
             return json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode("utf-8", "replace")[:400]
-        raise RuntimeError(f"{url} HTTP {exc.code}: {detail}")
+        # never echo the query string: some providers carry the API key there (SR-03/04)
+        safe_url = url.split("?", 1)[0]
+        raise RuntimeError(f"{safe_url} HTTP {exc.code}: {detail}")
+
+
+_MAX_GET_BYTES = 5 * 1024 * 1024  # cap the local-discovery response (SSRF hardening)
 
 
 def _get(url: str, timeout: int = 15) -> dict:
     req = urllib.request.Request(url, method="GET")
     with urllib.request.urlopen(req, timeout=timeout) as resp:
-        return json.loads(resp.read().decode("utf-8"))
+        return json.loads(resp.read(_MAX_GET_BYTES).decode("utf-8"))
 
 
 def local_base_url(base_url: str | None = None) -> str:
@@ -112,6 +117,27 @@ def _openai_compatible(cfg: ModelConfig, base_url: str, token_field: str = "max_
     return call
 
 
+def make_embedding(provider: str = "openai", model: str = "text-embedding-3-small",
+                   root: str = ".") -> Callable[[str], list]:
+    """Build a callable(text)->vector for a real embedding model (FR-27, TC-09).
+
+    Used to give the meaning gate a semantic metric instead of a token n-gram proxy.
+    Keys are read from the same `<provider>.key.txt` files and never logged.
+    """
+    provider = provider.lower()
+    if provider == "openai":
+        key = read_key("openai", root)
+
+        def embed(text: str) -> list:
+            body = {"model": model, "input": text}
+            headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
+            out = _post("https://api.openai.com/v1/embeddings", headers, body)
+            return out["data"][0]["embedding"]
+
+        return embed
+    raise RuntimeError(f"no embedding adapter for provider: {provider}")
+
+
 def _anthropic(cfg: ModelConfig) -> Callable[[str], str]:
     def call(prompt: str) -> str:
         body = {
@@ -134,15 +160,18 @@ def _anthropic(cfg: ModelConfig) -> Callable[[str], str]:
 
 def _gemini(cfg: ModelConfig) -> Callable[[str], str]:
     def call(prompt: str) -> str:
+        # the key goes in a header, never in the URL (SR-03/04): a URL can be logged,
+        # cached, or echoed in an error message
         url = (
             f"https://generativelanguage.googleapis.com/v1beta/models/"
-            f"{cfg.model}:generateContent?key={cfg.api_key}"
+            f"{cfg.model}:generateContent"
         )
         body = {
             "contents": [{"parts": [{"text": prompt}]}],
             "generationConfig": {"temperature": cfg.temperature, "maxOutputTokens": cfg.max_tokens},
         }
-        out = _post(url, {"Content-Type": "application/json"}, body)
+        headers = {"Content-Type": "application/json", "x-goog-api-key": cfg.api_key}
+        out = _post(url, headers, body)
         cands = out.get("candidates", [])
         if not cands:
             return ""
@@ -152,6 +181,9 @@ def _gemini(cfg: ModelConfig) -> Callable[[str], str]:
     return call
 
 
+_KNOWN_PROVIDERS = {"local", "claude", "gemini"} | set(_OPENAI_COMPAT)
+
+
 def make_model(
     provider: str,
     model: str | None = None,
@@ -159,14 +191,22 @@ def make_model(
     temperature: float = 1.0,
     max_tokens: int = 512,
     base_url: str | None = None,
+    gated: bool = True,
 ) -> Callable[[str], str]:
     """Build a callable(prompt)->text for a real provider (FR-37, IR-01).
+
+    By default the callable is wrapped in the ModelGateway, so every model-bound path
+    runs the carrier sanitize before the model sees the prompt and fails closed (SR-06,
+    SR-09). Pass gated=False only for a sandbox path that must never reach an API.
 
     For the local provider the base URL is configurable (base_url, then BLEACHMARK_LOCAL_URL),
     so it can point at a local engine such as tars.uberadmin.com:5150. When no model is named,
     the tool asks the local engine for the model it serves.
     """
     provider = provider.lower()
+    # validate before building any file path, so a provider name cannot traverse (SR-03/04)
+    if provider not in _KNOWN_PROVIDERS:
+        raise RuntimeError(f"unknown provider: {provider}")
     if provider == "local":
         url = local_base_url(base_url)
         chosen = model
@@ -179,16 +219,21 @@ def make_model(
         cfg = ModelConfig("local", chosen, "", temperature, max_tokens)
         # a local model can be large and slow, so allow a long timeout (env-overridable)
         timeout = int(os.environ.get("BLEACHMARK_LOCAL_TIMEOUT", "600"))
-        return _openai_compatible(cfg, url, token_field="max_tokens", timeout=timeout)
-    api_key = read_key(provider, root)
-    cfg = ModelConfig(provider, model or DEFAULT_MODELS.get(provider, provider), api_key,
-                      temperature, max_tokens)
-    if provider == "claude":
-        return _anthropic(cfg)
-    if provider == "gemini":
-        return _gemini(cfg)
-    if provider in _OPENAI_COMPAT:
-        # newer OpenAI models reject max_tokens and want max_completion_tokens
-        field = "max_completion_tokens" if provider == "openai" else "max_tokens"
-        return _openai_compatible(cfg, _OPENAI_COMPAT[provider], token_field=field)
-    raise RuntimeError(f"unknown provider: {provider}")
+        raw = _openai_compatible(cfg, url, token_field="max_tokens", timeout=timeout)
+    else:
+        api_key = read_key(provider, root)
+        cfg = ModelConfig(provider, model or DEFAULT_MODELS.get(provider, provider), api_key,
+                          temperature, max_tokens)
+        if provider == "claude":
+            raw = _anthropic(cfg)
+        elif provider == "gemini":
+            raw = _gemini(cfg)
+        else:  # an OpenAI-compatible provider (openai, xai, mistral)
+            # newer OpenAI models reject max_tokens and want max_completion_tokens
+            field = "max_completion_tokens" if provider == "openai" else "max_tokens"
+            raw = _openai_compatible(cfg, _OPENAI_COMPAT[provider], token_field=field)
+    if not gated:
+        return raw
+    from .model import ModelGateway
+
+    return ModelGateway(raw, is_api=True).call

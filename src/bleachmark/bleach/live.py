@@ -27,7 +27,7 @@ import os
 import subprocess
 import sys
 import tempfile
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from ..detect.code import _strip_fences, _residual_variability, structural_normalize
 from ..detect.features import featurize
@@ -238,40 +238,6 @@ def bleach_task(model_fn, task: Task, lang: str, attempts: int = 2, mode: str = 
     )
 
 
-@dataclass
-class LiveBleachSummary:
-    lang: str
-    ok: bool
-    model: str = ""
-    per_task: list = field(default_factory=list)
-    meaning_preserved_rate: float = 0.0
-    mean_structural_change: float = 0.0
-    error: str = ""
-
-
-def run_live_bleach(provider: str, langs=("python", "c"), tasks=None, root=".", attempts: int = 2):
-    from ..runtime.providers import make_model, DEFAULT_MODELS
-
-    tasks = tasks or TASKS
-    out = []
-    for lang in langs:
-        try:
-            fn = make_model(provider, root=root, temperature=1.0, max_tokens=500)
-            results = [bleach_task(fn, t, lang, attempts=attempts) for t in tasks]
-            preserved = [r for r in results if r.original_ok and r.meaning_preserved]
-            usable = [r for r in results if r.original_ok]
-            changes = [r.structural_change for r in preserved]
-            out.append(LiveBleachSummary(
-                lang=lang, ok=True, model=f"{provider}:{DEFAULT_MODELS.get(provider, '')}",
-                per_task=[r.__dict__ for r in results],
-                meaning_preserved_rate=round(len(preserved) / len(usable), 3) if usable else 0.0,
-                mean_structural_change=round(sum(changes) / len(changes), 4) if changes else 0.0,
-            ))
-        except Exception as exc:
-            out.append(LiveBleachSummary(lang=lang, ok=False, error=f"{type(exc).__name__}: {exc}"[:300]))
-    return out
-
-
 # --- the steal-and-test gap before and after the bleach -----------------------
 
 
@@ -396,23 +362,6 @@ def compare_bleach_modes(model_fn, task: Task, lang: str, n_samples: int = 20, k
         "diversify": {"slots": sv, "gap": gv, "z": zv, "p": pv,
                       "meaning_kept_rate": round(div_kept / len(valid), 3)},
     }
-
-
-def run_compare_bleach(provider: str, langs=("python",), tasks=None, n_samples: int = 20,
-                       root=".", attempts: int = 2):
-    from ..runtime.providers import make_model, DEFAULT_MODELS
-
-    tasks = tasks or TASKS
-    out = []
-    for lang in langs:
-        try:
-            fn = make_model(provider, root=root, temperature=1.0, max_tokens=500)
-            rows = [compare_bleach_modes(fn, t, lang, n_samples=n_samples, attempts=attempts) for t in tasks]
-            out.append({"lang": lang, "ok": True,
-                        "model": f"{provider}:{DEFAULT_MODELS.get(provider, '')}", "per_task": rows})
-        except Exception as exc:
-            out.append({"lang": lang, "ok": False, "error": f"{type(exc).__name__}: {exc}"[:300]})
-    return out
 
 
 def run_style_calibration(candidate_provider: str, reference_providers: list[str], task: Task,
@@ -570,23 +519,3 @@ def run_prose_calibration(candidate_provider: str, reference_providers: list[str
         return {"ok": False, "error": f"{type(exc).__name__}: {exc}"[:300]}
 
 
-def run_bleach_gap(provider: str, langs=("python", "c"), tasks=None, n_samples: int = 24,
-                   root=".", attempts: int = 2, mode: str = "diversify"):
-    from ..runtime.providers import make_model, DEFAULT_MODELS
-
-    tasks = tasks or TASKS
-    out = []
-    for lang in langs:
-        try:
-            fn = make_model(provider, root=root, temperature=1.0, max_tokens=500)
-            gaps = [bleach_gap(fn, t, lang, n_samples=n_samples, attempts=attempts, mode=mode) for t in tasks]
-            out.append({
-                "lang": lang,
-                "ok": True,
-                "model": f"{provider}:{DEFAULT_MODELS.get(provider, '')}",
-                "mode": mode,
-                "per_task": [g.__dict__ for g in gaps],
-            })
-        except Exception as exc:
-            out.append({"lang": lang, "ok": False, "error": f"{type(exc).__name__}: {exc}"[:300]})
-    return out

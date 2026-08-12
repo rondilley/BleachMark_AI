@@ -18,14 +18,21 @@ from .report.calibration_emit import to_json_calibration, to_markdown_calibratio
 
 
 def _read_input(path: str | None) -> str:
+    # the input is hostile and may hold malformed bytes; decode without crashing
+    # (replace bad bytes) rather than dumping a traceback
     if path and path != "-":
-        with open(path, encoding="utf-8") as fh:
+        with open(path, encoding="utf-8", errors="replace") as fh:
             return fh.read()
-    return sys.stdin.read()
+    return sys.stdin.buffer.read().decode("utf-8", errors="replace")
 
 
 def _cmd_detect(args) -> int:
     text = _read_input(args.file)
+    if args.show_payload:
+        sys.stderr.write(
+            "WARNING: --show-payload prints decoded payload cleartext; "
+            "do not paste it where it could execute (SR-08).\n"
+        )
     report = detect_carriers(text, target=args.file or "<stdin>")
     if args.json:
         print(to_json(report, show_payload=args.show_payload))

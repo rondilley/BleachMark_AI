@@ -15,16 +15,21 @@ class _ZeroWidth:
     def detect(self, decoded: DecodedText) -> list[Finding]:
         text = decoded.text
         hits: list[Location] = []
-        for i, ch in enumerate(text):
+        has_rtl = None  # computed once, on the first candidate, and reused
+        # ASCII holds no format (Cf) characters, so only non-ASCII positions can match
+        for m in context.NON_ASCII.finditer(text):
+            ch = m.group()
             if unicodedata.category(ch) != "Cf":
                 continue
             cp = ord(ch)
             # the Tags block is Cf too, but the tags detector owns it
             if 0xE0000 <= cp <= 0xE007F:
                 continue
-            if context.exonerate_zero_width(text, i):
+            if has_rtl is None:
+                has_rtl = context.contains_rtl(text)
+            if context.exonerate_zero_width(text, m.start(), has_rtl):
                 continue
-            hits.append(decoded.location_of(i))
+            hits.append(decoded.location_of(m.start()))
         if not hits:
             return []
         return [

@@ -6,9 +6,6 @@ from ...decode import DecodedText
 from ...model import Finding, Location, Posture, Severity
 from . import context
 
-_NORMAL_SPACE = 0x20
-_TAB = 0x09
-
 
 def _is_space_like(cp: int) -> bool:
     return (
@@ -33,15 +30,12 @@ class _Whitespace:
         if trailing_lines >= 2:
             notes.append(f"{trailing_lines} line(s) with trailing whitespace (SNOW-style)")
 
-        # non-U+0020 space characters substituted for a normal space
-        for i, ch in enumerate(text):
-            cp = ord(ch)
-            if cp in (_NORMAL_SPACE, _TAB):
-                continue
-            if _is_space_like(cp):
-                if context.exonerate_typographic_space(text, i):
-                    continue
-                hits.append(decoded.location_of(i))
+        # substituted space characters are all non-ASCII; the typographic-density
+        # exoneration is document-global, so decide it once for the whole text
+        if not context.typographic_density_exonerates(text):
+            for m in context.NON_ASCII.finditer(text):
+                if _is_space_like(ord(m.group())):
+                    hits.append(decoded.location_of(m.start()))
 
         if not hits and not notes:
             return []

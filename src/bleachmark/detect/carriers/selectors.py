@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
+import re
+
 from ...decode import DecodedText
 from ...model import Finding, Location, Posture, Severity
 from . import context
 
-
-def _is_selector(cp: int) -> bool:
-    return 0xFE00 <= cp <= 0xFE0F or 0xE0100 <= cp <= 0xE01EF
+# variation selectors (U+FE00..FE0F) and the supplement (U+E0100..E01EF); a run of
+# consecutive selectors is the carrier. Built from chr() so the source is ASCII-only.
+_SELECTOR_RUN = re.compile(
+    "[" + chr(0xFE00) + "-" + chr(0xFE0F) + chr(0xE0100) + "-" + chr(0xE01EF) + "]+"
+)
 
 
 class _Selectors:
@@ -17,23 +21,13 @@ class _Selectors:
     def detect(self, decoded: DecodedText) -> list[Finding]:
         text = decoded.text
         hits: list[Location] = []
-        i = 0
-        while i < len(text):
-            if not _is_selector(ord(text[i])):
-                i += 1
-                continue
-            # measure the run length starting here
-            run = i
-            while run < len(text) and _is_selector(ord(text[run])):
-                run += 1
-            run_len = run - i
+        for m in _SELECTOR_RUN.finditer(text):
+            run_len = m.end() - m.start()
             # a single selector on a valid base is legitimate; a run is smuggling
-            if run_len == 1 and context.exonerate_selector(text, i):
-                i = run
+            if run_len == 1 and context.exonerate_selector(text, m.start()):
                 continue
-            for j in range(i, run):
+            for j in range(m.start(), m.end()):
                 hits.append(decoded.location_of(j))
-            i = run
         if not hits:
             return []
         return [

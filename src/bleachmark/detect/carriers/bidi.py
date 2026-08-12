@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
+import re
+
 from ...decode import DecodedText
 from ...model import Finding, Location, Posture, Severity
 
 _LRO = 0x202D
 _RLO = 0x202E
-_EMBED_ISOLATE = set(range(0x202A, 0x202F)) | set(range(0x2066, 0x206A))
+# overrides are the Trojan Source signal; the marks (LRM/RLM) are exonerated and
+# handled by the zero-width detector's context rules. Build the class from chr() so
+# the source holds no literal invisible character.
+_OVERRIDE = re.compile("[" + chr(_LRO) + chr(_RLO) + "]")
 
 
 class _Bidi:
@@ -15,12 +20,7 @@ class _Bidi:
 
     def detect(self, decoded: DecodedText) -> list[Finding]:
         text = decoded.text
-        hits: list[Location] = []
-        for i, ch in enumerate(text):
-            cp = ord(ch)
-            # overrides are the Trojan Source signal; marks (LRM/RLM) are exonerated
-            if cp in (_LRO, _RLO):
-                hits.append(decoded.location_of(i))
+        hits: list[Location] = [decoded.location_of(m.start()) for m in _OVERRIDE.finditer(text)]
         if not hits:
             return []
         return [

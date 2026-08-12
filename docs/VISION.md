@@ -164,10 +164,9 @@ Tell the user the preconditions. Add clear labels.
 **Year 1 — Foundation (2026).** Release v0.1 with the full scope.
 
 The tool detects a post-hoc carrier accurately with context exoneration. The tool
-scores text for machine-generation likelihood at a stated false-positive rate. The
-tool runs keyless statistical anomaly checks. The tool uses comparison across runs
-and models to find a possible watermark. The tool gives neural detectors and a
-black-box watermark-presence test.
+uses comparison across runs and models to find a possible watermark. The tool runs
+the keyed watermark tests (the green-list z-test and SynthID) when a key is
+available, and a black-box watermark-presence test.
 
 The tool bleaches text at selectable strengths behind a meaning-preservation gate.
 The bleach includes deterministic, token-level, and model-based methods. The
@@ -204,8 +203,8 @@ against the newest known methods.
   ASCII and Markdown text statistics.
 - BleachMark does not promise to remove a robust or undetectable watermark without
   a cost to meaning. It tells the user the limit.
-- BleachMark does not give a yes-or-no "AI-written" result from a perplexity
-  indication alone.
+- BleachMark does not classify text as AI-written or human-written. Its input is
+  model output by definition, so that question is not in scope.
 
 ## 7. What success looks like at the horizon
 

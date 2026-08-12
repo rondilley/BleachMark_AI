@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
+import re
+
 from ...decode import DecodedText
 from ...model import Finding, Location, Posture, Severity, redact_payload
 from . import context
+
+# Unicode Tags block U+E0000..E007F; built from chr() so the source is ASCII-only
+_TAG_CHAR = re.compile("[" + chr(0xE0000) + "-" + chr(0xE007F) + "]")
 
 
 def decode_tag_run(text: str) -> str:
@@ -24,14 +29,14 @@ class _Tags:
         text = decoded.text
         hits: list[Location] = []
         payload_chars: list[str] = []
-        for i, ch in enumerate(text):
-            cp = ord(ch)
-            if not (0xE0000 <= cp <= 0xE007F):
+        # a subdivision flag frames its tag run with U+1F3F4 ... U+E007F; compute the
+        # exonerated spans once instead of rescanning for every tag character
+        flag_indices = context.subdivision_flag_indices(text)
+        for m in _TAG_CHAR.finditer(text):
+            if m.start() in flag_indices:
                 continue
-            if context.in_subdivision_flag(text, i):
-                continue
-            hits.append(decoded.location_of(i))
-            payload_chars.append(ch)
+            hits.append(decoded.location_of(m.start()))
+            payload_chars.append(m.group())
         if not hits:
             return []
         decoded_ascii = decode_tag_run("".join(payload_chars))
