@@ -415,6 +415,154 @@ def run_compare_bleach(provider: str, langs=("python",), tasks=None, n_samples: 
     return out
 
 
+def run_style_calibration(candidate_provider: str, reference_providers: list[str], task: Task,
+                          lang: str = "python", n_samples: int = 16, root: str = ".",
+                          k: int = 4, alpha: float = 0.05,
+                          model_factory=None) -> dict:
+    """Calibrate a style baseline from reference models and score the candidate model.
+
+    The candidate is the model the tool checks for a watermark. The references are models
+    the tool treats as unwatermarked. Every corpus is generated at the same size with a
+    light prompt, so the structural style is in place. The result is a false-positive rate
+    against the reference style, not a yes-or-no verdict (FR-14, FR-15).
+    """
+    from ..runtime.providers import make_model, DEFAULT_MODELS
+    from ..detect.calibrate import calibrate_from_code
+
+    if model_factory is None:
+        model_factory = make_model
+
+    def corpus(provider: str) -> list[str]:
+        fn = model_factory(provider, root=root, temperature=1.0, max_tokens=500)
+        return [normalize_carriers(fn(gen_prompt(task, lang, tight=False))) for _ in range(n_samples)]
+
+    try:
+        candidate = corpus(candidate_provider)
+        references, used = [], []
+        for rp in reference_providers:
+            try:
+                references.append(corpus(rp))
+                used.append(f"{rp}:{DEFAULT_MODELS.get(rp, '')}")
+            except Exception as exc:  # a reference provider may fail; keep the others
+                used.append(f"{rp}: ERROR {type(exc).__name__}")
+        live_refs = [c for c in references if c]
+        if not live_refs:
+            return {"ok": False, "error": "no reference corpus was generated"}
+        finding = calibrate_from_code(candidate, live_refs, lang, k=k, alpha=alpha,
+                                      sources=used)
+        return {
+            "ok": True,
+            "task": task.name,
+            "lang": lang,
+            "candidate": f"{candidate_provider}:{DEFAULT_MODELS.get(candidate_provider, '')}",
+            "references": used,
+            "n_samples": n_samples,
+            "finding": finding.__dict__,
+        }
+    except Exception as exc:
+        return {"ok": False, "error": f"{type(exc).__name__}: {exc}"[:300]}
+
+
+PROSE_TOPICS = [
+    "cities should expand protected bike lanes",
+    "public libraries deserve more funding",
+    "remote work is good for the economy",
+    "schools should start later in the morning",
+    "cities should plant more street trees",
+    "public transit should be free at the point of use",
+    "governments should invest in flood defenses",
+    "small towns need faster internet",
+    "museums should stay free to enter",
+    "cities should cap short-term rentals",
+    "universities should teach more statistics",
+    "local news deserves public support",
+    "parks are worth the maintenance cost",
+    "recycling programs should be simplified",
+    "cities should widen sidewalks downtown",
+    "night trains should return to the region",
+    "farmers markets strengthen local economies",
+    "coding should be taught in primary school",
+    "streetlights should switch to warmer light",
+    "the city should protect its old cinemas",
+    "apprenticeships deserve the same respect as degrees",
+    "cities should meter downtown parking",
+    "rivers in the region should be cleaned up",
+    "the school day should include more time outdoors",
+    "public swimming pools should stay open all year",
+    "the region needs more affordable housing",
+    "voting should be easier for shift workers",
+    "food waste should be composted at the curb",
+    "the town should bury its power lines",
+    "sports fields should be shared with the public",
+    "the region should protect its dark night skies",
+    "clinics should open on weekends",
+]
+
+
+def run_prose_calibration(candidate_provider: str, reference_providers: list[str],
+                          n_samples: int = 16, root: str = ".", min_words: int = 400,
+                          alpha: float = 0.05, model_factory=None) -> dict:
+    """Dense prose detection: score a candidate model against a reference style baseline (FR-14/15).
+
+    Each model writes one editorial for each of several varied topics, so the shared structure is
+    the language and any watermark, not the topic. The tool tokenizes the editorials and scores the
+    candidate context-structure gap as a false-positive rate against the reference models. Prose
+    needs a dense corpus, so this uses many long samples.
+    """
+    from ..runtime.providers import make_model, DEFAULT_MODELS
+    from ..detect.prose import prose_tokens, calibrate_prose
+
+    if model_factory is None:
+        model_factory = make_model
+    topics = PROSE_TOPICS[:n_samples]
+
+    def _spec(ref: str):
+        # a reference is "provider" or "provider:model" (a pre-cutoff or a local model)
+        provider, _, model = ref.partition(":")
+        return provider, (model or None)
+
+    def _label(provider: str, model) -> str:
+        return f"{provider}:{model or DEFAULT_MODELS.get(provider, '')}"
+
+    def corpus(provider: str, model=None) -> list[list[str]]:
+        fn = model_factory(provider, model=model, root=root, temperature=1.0, max_tokens=1200)
+        out = []
+        for topic in topics:
+            text = normalize_carriers(fn(
+                f"Write an editorial of at least {min_words} words arguing that {topic}. "
+                "Return only the prose."))
+            out.append(prose_tokens(text))
+        return out
+
+    try:
+        candidate = corpus(candidate_provider)
+        references, used = [], []
+        for rp in reference_providers:
+            provider, model = _spec(rp)
+            try:
+                references.append(corpus(provider, model))
+                used.append(_label(provider, model))
+            except Exception as exc:
+                used.append(f"{_label(provider, model)}: ERROR {type(exc).__name__}")
+        live_refs = [c for c in references if c]
+        if not live_refs:
+            return {"ok": False, "error": "no reference corpus was generated"}
+        finding = calibrate_prose(candidate, live_refs, alpha=alpha, sources=used)
+        cand_words = sum(len(s) for s in candidate)
+        return {
+            "ok": True,
+            "task": "prose editorials",
+            "lang": "english",
+            "candidate": f"{candidate_provider}:{DEFAULT_MODELS.get(candidate_provider, '')}",
+            "references": used,
+            "n_samples": n_samples,
+            "candidate_words": cand_words,
+            "finding": finding.__dict__,
+        }
+    except Exception as exc:
+        return {"ok": False, "error": f"{type(exc).__name__}: {exc}"[:300]}
+
+
 def run_bleach_gap(provider: str, langs=("python", "c"), tasks=None, n_samples: int = 24,
                    root=".", attempts: int = 2, mode: str = "diversify"):
     from ..runtime.providers import make_model, DEFAULT_MODELS
