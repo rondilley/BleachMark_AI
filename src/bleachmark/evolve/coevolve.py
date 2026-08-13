@@ -110,11 +110,17 @@ class DefensePrompt:
             sig = "int f(int x)" if lang == "c" else "def f(x)"
             parts.append(f"Use exactly this signature: {sig}. Name every local a, b, c.")
         if self.lock_structure:
-            parts.append("Use a single loop and a single return. Do not use a helper.")
+            parts.append(
+                "Use one public entry and helpers named h0, h1, h2. "
+                "Helpers are allowed so the module can exceed 400 words."
+            )
         if self.iterative_only:
             parts.append("Iterative only, no recursion.")
         if self.no_comments:
             parts.append("No comments, no docstring, no prose.")
+        from ..detect.length import length_requirement
+
+        parts.append(length_requirement())
         parts.append("Return only the code.")
         return " ".join(parts)
 

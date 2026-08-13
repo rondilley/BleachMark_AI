@@ -1,0 +1,15 @@
+{
+  "_note": "Operating thresholds sit between the changed max and the preserved min on the bundled pairs. English keeps 0.60, the existing n-gram band. Arabic needs a higher floor because changed pairs still share script n-grams.",
+  "en": {"metric": "word_char", "threshold": 0.6, "char_n": 3, "word_n": 2},
+  "es": {"metric": "word_char", "threshold": 0.45, "char_n": 3, "word_n": 2},
+  "fr": {"metric": "word_char", "threshold": 0.45, "char_n": 3, "word_n": 2},
+  "de": {"metric": "word_char", "threshold": 0.45, "char_n": 3, "word_n": 2},
+  "ru": {"metric": "word_char", "threshold": 0.45, "char_n": 3, "word_n": 2},
+  "zh": {"metric": "char", "threshold": 0.25, "char_n": 2},
+  "ja": {"metric": "char", "threshold": 0.45, "char_n": 2},
+  "ko": {"metric": "char", "threshold": 0.25, "char_n": 2},
+  "ar": {"metric": "char", "threshold": 0.52, "char_n": 3},
+  "he": {"metric": "char", "threshold": 0.45, "char_n": 3},
+  "hi": {"metric": "char", "threshold": 0.25, "char_n": 3},
+  "und": {"metric": "char", "threshold": 0.25, "char_n": 3}
+}

@@ -56,7 +56,7 @@ def bleach(
         candidate = paraphrase_bleach(cleaned, model=model)
 
     score = gate.similarity(cleaned, candidate, language=language)
-    if not gate.passes(score):
+    if not gate.passes(score, language=language):
         # reject a bleach that does not keep the meaning; return the input (FR-28)
         return BleachResult(
             cleaned, int(strength), False, score,

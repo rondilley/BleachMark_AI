@@ -94,12 +94,14 @@ def _real_probe(
     runs: int,
 ) -> tuple[float, float, int, str]:
     """Run the evolved constraint against two model arms; measure the residual."""
+    from ..detect.length import length_requirement
+
     constraint = defense.describe(lang=lang)
-    verb = "a C function" if lang == "c" else "a Python function"
+    verb = "a complete C module" if lang == "c" else "a complete Python module"
     tail = " Return only the code, no includes." if lang == "c" else ""
     cand_res, ctrl_res, corpus_words = [], [], 0
     for task in tasks:
-        prompt = f"Write {verb} for: {task}. {constraint}{tail}"
+        prompt = f"Write {verb} for: {task}. {length_requirement()} {constraint}{tail}"
         cand = [candidate_fn(prompt) for _ in range(runs)]
         ctrl = [control_fn(prompt) for _ in range(runs)]
         corpus_words += sum(len(s.split()) for s in cand)
@@ -146,14 +148,18 @@ def _real(
     try:
         if control_mode == "same":
             ctrl_temp = temp_high if temp_low is None else temp_low
-            candidate_fn = model_factory(candidate_provider, root=root, temperature=temp_high, max_tokens=400)
-            control_fn = model_factory(candidate_provider, root=root, temperature=ctrl_temp, max_tokens=400)
+            from ..detect.length import USEFUL_MAX_TOKENS
+
+            candidate_fn = model_factory(candidate_provider, root=root, temperature=temp_high, max_tokens=USEFUL_MAX_TOKENS)
+            control_fn = model_factory(candidate_provider, root=root, temperature=ctrl_temp, max_tokens=USEFUL_MAX_TOKENS)
             cand_label = label(candidate_provider, temp_high)
             split = " (split-half)" if temp_low is None else ""
             ctrl_label = label(candidate_provider, ctrl_temp, split)
         else:
-            candidate_fn = model_factory(candidate_provider, root=root, temperature=temp_high, max_tokens=400)
-            control_fn = model_factory(control_provider, root=root, temperature=temp_high, max_tokens=400)
+            from ..detect.length import USEFUL_MAX_TOKENS
+
+            candidate_fn = model_factory(candidate_provider, root=root, temperature=temp_high, max_tokens=USEFUL_MAX_TOKENS)
+            control_fn = model_factory(control_provider, root=root, temperature=temp_high, max_tokens=USEFUL_MAX_TOKENS)
             cand_label = label(candidate_provider, temp_high)
             ctrl_label = label(control_provider, temp_high)
         cr, xr, words, constraint = _real_probe(
@@ -215,14 +221,16 @@ def _partition_probe(
     from ..runtime.providers import DEFAULT_MODELS
 
     try:
-        fn = model_factory(provider, root=root, temperature=1.0, max_tokens=400)
+        from ..detect.length import USEFUL_MAX_TOKENS, length_requirement
+
+        fn = model_factory(provider, root=root, temperature=1.0, max_tokens=USEFUL_MAX_TOKENS)
         constraint = defense.describe(lang=lang)
-        verb = "a C function" if lang == "c" else "a Python function"
+        verb = "a complete C module" if lang == "c" else "a complete Python module"
         tail = " Return only the code, no includes." if lang == "c" else ""
         per_task: list[dict] = []
         gaps, zs, ps, keyed = [], [], [], []
         for task in tasks:
-            prompt = f"Write {verb} for: {task}. {constraint}{tail}"
+            prompt = f"Write {verb} for: {task}. {length_requirement()} {constraint}{tail}"
             samples = [fn(prompt) for _ in range(runs)]
             fm = featurize(samples, lang, k=k)
             if fm.n_slots < 2:

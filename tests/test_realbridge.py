@@ -40,6 +40,7 @@ def test_genome_compiles_constraints():
     assert "def f(x)" in prompt
     assert "no recursion" in prompt.lower()
     assert "no comments" in prompt.lower()
+    assert "more than 400" in prompt.lower()
 
 
 def test_cache_avoids_repeat_calls():

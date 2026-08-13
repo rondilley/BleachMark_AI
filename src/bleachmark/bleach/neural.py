@@ -20,6 +20,8 @@ def paraphrase_bleach(text: str, model=None, gateway: ModelGateway | None = None
     gw = gateway or ModelGateway(model)
     prompt = (
         "Paraphrase the following text. Keep the meaning and the facts. "
-        "Change the wording and the sentence structure.\n\n" + text
+        "Change the wording and the sentence structure. "
+        "If the input is more than 400 words, the rewrite must also be more than 400 words. "
+        "Shorter output is not useful and is rejected.\n\n" + text
     )
     return gw.call(prompt)

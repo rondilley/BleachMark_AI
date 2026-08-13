@@ -49,7 +49,8 @@ def reverse_word_decode(text: str) -> str:
 def transcode_prompt(task_desc: str, min_words: int = 400) -> str:
     """Tell the model to write the prose with the letters of each word reversed."""
     return (
-        f"Write {task_desc}. It must be at least {min_words} words. "
+        f"Write {task_desc}. The output must be more than {min_words} words. "
+        "Shorter output is not useful and is rejected. "
         "Write it in English, but REVERSE THE LETTERS of every word, keeping the word order and "
         "the punctuation. For example 'the city' becomes 'eht ytic'. Return only the "
         "reversed-letter text."

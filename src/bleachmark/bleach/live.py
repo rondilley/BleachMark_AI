@@ -148,13 +148,18 @@ def functional_gate(code: str, task: Task, lang: str) -> GateResult:
 
 
 def gen_prompt(task: Task, lang: str, tight: bool = True) -> str:
+    from ..detect.length import length_requirement
+
     sig = _sig_c(task) if lang == "c" else _sig_py(task)
-    verb = "a C function" if lang == "c" else "a Python function"
+    verb = "a complete C module" if lang == "c" else "a complete Python module"
     tail = " No includes." if lang == "c" else ""
     # a light prompt leaves the natural structural variation in place, so the
     # deterministic normalizer has operand-order and comparison slots to close
     style = " Iterative where you can." if tight else ""
-    return f"Write {verb}: {sig} that will {task.desc}.{style}{tail} Return only the code."
+    return (
+        f"Write {verb} whose public entry is {sig} and that will {task.desc}. "
+        f"{length_requirement()}{style}{tail} Return only the code."
+    )
 
 
 def deterministic_bleach(code: str, lang: str) -> str:
@@ -175,18 +180,22 @@ def bleach_prompt(task: Task, lang: str, original: str, mode: str = "diversify")
     if mode == "canonical":
         # Drive every sample toward ONE textbook form, so the corpus converges and the
         # residual structural channel closes. This is the corpus-level bleach.
+        from ..detect.length import length_requirement
+
         return (
-            f"Rewrite this {lang_name} function as the single most standard, textbook "
-            f"implementation, with the signature {sig}. Use the conventional loop and the "
+            f"Rewrite this {lang_name} module as the single most standard, textbook "
+            f"implementation, with the public entry {sig}. Use the conventional loop and the "
             f"conventional local names a, b, c. Do not vary the structure and do not add "
-            f"cleverness or comments. Write it the way it is most commonly written. Return "
-            f"only the code.\n\n{original}"
+            f"cleverness or comments. Write it the way it is most commonly written. "
+            f"{length_requirement()} Return only the code.\n\n{original}"
         )
+    from ..detect.length import length_requirement
+
     return (
-        f"Rewrite this {lang_name} function with a DIFFERENT internal structure but the "
-        f"exact same behavior and the same signature {sig}. Change the operand order, the "
+        f"Rewrite this {lang_name} module with a DIFFERENT internal structure but the "
+        f"exact same behavior and the same public entry {sig}. Change the operand order, the "
         f"loop style, the temporaries, and the statement order where you can. Do not add "
-        f"comments. Return only the code.\n\n{original}"
+        f"comments. {length_requirement()} Return only the code.\n\n{original}"
     )
 
 
@@ -382,7 +391,9 @@ def run_style_calibration(candidate_provider: str, reference_providers: list[str
         model_factory = make_model
 
     def corpus(provider: str) -> list[str]:
-        fn = model_factory(provider, root=root, temperature=1.0, max_tokens=500)
+        from ..detect.length import USEFUL_MAX_TOKENS
+
+        fn = model_factory(provider, root=root, temperature=1.0, max_tokens=USEFUL_MAX_TOKENS)
         return [normalize_carriers(fn(gen_prompt(task, lang, tight=False))) for _ in range(n_samples)]
 
     try:
@@ -481,12 +492,15 @@ def run_prose_calibration(candidate_provider: str, reference_providers: list[str
         return f"{provider}:{model or DEFAULT_MODELS.get(provider, '')}"
 
     def corpus(provider: str, model=None) -> list[list[str]]:
-        fn = model_factory(provider, model=model, root=root, temperature=1.0, max_tokens=1200)
+        from ..detect.length import USEFUL_MAX_TOKENS, length_requirement
+
+        fn = model_factory(provider, model=model, root=root, temperature=1.0,
+                           max_tokens=max(USEFUL_MAX_TOKENS, min_words * 3))
         out = []
         for topic in topics:
             text = normalize_carriers(fn(
-                f"Write an editorial of at least {min_words} words arguing that {topic}. "
-                "Return only the prose."))
+                f"Write an editorial arguing that {topic}. {length_requirement()} "
+                f"Aim for more than {min_words} words. Return only the prose."))
             out.append(prose_tokens(text))
         return out
 

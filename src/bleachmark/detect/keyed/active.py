@@ -24,7 +24,10 @@ class ActiveResult:
 def active_presence_test(
     query_fn: Callable[[str], str],
     control_fn: Callable[[str], str],
-    prompt: str = "Write a short neutral paragraph about the weather.",
+    prompt: str = (
+        "Write an editorial about the weather and how a city should plan for it. "
+        "The output must be more than 400 words. Shorter output is not useful and is rejected."
+    ),
     runs: int = 10,
     ratio_threshold: float = 2.0,
 ) -> ActiveResult:

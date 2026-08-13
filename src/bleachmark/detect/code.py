@@ -11,9 +11,9 @@ The probe minimizes the places a watermark can hide, then looks at what is left.
    use this residual channel, so a watermark shows up as residual variability that
    the control model does not have.
 
-The probe aggregates a suite of well-known functions so the corpus reaches the
-400-to-800-word attribution band (FR-49); one canonical function is too short.
-The probe does not force the full output, because a forced token carries no
+Each generation must be more than 400 words (FR-49, FR-55). A short function is
+not useful. The probe asks for a complete module, not one tiny routine. The probe
+does not force the full output token by token, because a forced token carries no
 watermark (research 3).
 """
 
@@ -26,6 +26,7 @@ from dataclasses import dataclass, field
 from typing import Callable
 
 from .code_c import canonicalize_c
+from .length import ATTRIBUTION_WORDS, MIN_USEFUL_WORDS, is_useful_length, length_requirement
 
 _TOKEN = re.compile(r"\w+|[^\w\s]", re.UNICODE)
 _CODE_FENCE = re.compile(r"```[a-zA-Z]*\n?|```")
@@ -184,43 +185,30 @@ class CodeProbeResult:
 
 
 DEFAULT_SUITE = [
-    "the nth Fibonacci number, iterative",
-    "reverse a string",
-    "check whether an integer is prime",
-    "compute the factorial of n, iterative",
-    "return the maximum of a list",
-    "count vowels in a string",
-    "compute the greatest common divisor of a and b",
-    "check whether a string is a palindrome",
-    "sum the digits of an integer",
-    "return the second largest value in a list",
+    "an integer toolkit: gcd, lcm, prime test, factorize, fib, factorial, digit sum, and a checksum driver over a built-in case table",
+    "a string toolkit: reverse, palindrome, split, join, find, replace, vowel count, and a checksum driver over a built-in case table",
+    "an array toolkit: min, max, second-max, sort, unique, sum, and a checksum driver over a built-in case table",
+    "a small expression evaluator for + - * / and parentheses, plus a case table driver",
+    "a table-driven state machine that parses a tiny CSV subset, plus a case table driver",
 ]
 
-DEFAULT_SUITE_C = [
-    "the nth Fibonacci number, iterative",
-    "reverse a string in place",
-    "check whether an integer is prime",
-    "compute the factorial of n, iterative",
-    "return the maximum value in an int array",
-    "count vowels in a string",
-    "compute the greatest common divisor of a and b",
-    "check whether a string is a palindrome",
-    "sum the decimal digits of an integer",
-    "return the second largest value in an int array",
-]
+DEFAULT_SUITE_C = list(DEFAULT_SUITE)
 
 _PROMPT_PY = (
-    "Write a Python function for: {task}.\n"
-    "Use exactly this signature: def f(x). Rename every local to a, b, c. "
-    "Iterative only, no recursion, no comments, no docstring, no prose. "
+    "Write a complete Python module for: {task}.\n"
+    "Public entry: def f(x). Helpers are allowed. Iterative where you can. "
+    + length_requirement()
+    + " Fill the length with real helpers and a case-table driver, not comments. "
     "Return only the code."
 )
 
 _PROMPT_C = (
-    "Write a C function for: {task}.\n"
-    "Use exactly this signature: int f(int x). Name every local a, b, c. "
-    "Iterative only, no recursion, no comments, no prose. "
-    "Return only the code, no includes."
+    "Write a complete C module for: {task}.\n"
+    "Public entry: int f(int x). Helpers are allowed. Iterative where you can. "
+    "No includes. "
+    + length_requirement()
+    + " Fill the length with real helpers and a case-table driver, not comments. "
+    "Return only the code."
 )
 
 
@@ -230,15 +218,15 @@ def suite_probe(
     tasks: list[str] | None = None,
     runs: int = 6,
     excess_threshold: float = 0.02,
-    min_words: int = 400,
+    min_words: int = MIN_USEFUL_WORDS,
     lang: str = "python",
 ) -> CodeProbeResult:
-    """Run the constrained, canonicalized probe over a suite of functions.
+    """Run the constrained, canonicalized probe over a suite of modules.
 
-    For each task the model writes the function `runs` times under a naming and
-    structure constraint. The probe canonicalizes each output and measures the
-    residual variability of the candidate against the control. It aggregates the
-    corpus word count to confirm the 400-to-800-word band. `lang` selects the
+    For each task the model writes the module `runs` times under a naming and
+    structure constraint. Each sample must be more than 400 words or it is not
+    useful. The probe canonicalizes each output and measures the residual
+    variability of the candidate against the control. `lang` selects the
     Python AST canonicalizer or the C lexical canonicalizer.
     """
     if tasks is None:
@@ -253,11 +241,15 @@ def suite_probe(
         cand = [candidate_fn(prompt) for _ in range(runs)]
         ctrl = [control_fn(prompt) for _ in range(runs)]
         corpus_words += sum(len(s.split()) for s in cand)
+        short = not all(is_useful_length(s) for s in cand)
         cr = _residual_variability(cand, lang)
         xr = _residual_variability(ctrl, lang)
         cand_res.append(cr)
         ctrl_res.append(xr)
-        per_task.append({"task": task, "candidate_residual": cr, "control_residual": xr})
+        per_task.append({
+            "task": task, "candidate_residual": cr, "control_residual": xr,
+            "short": short,
+        })
     cand_mean = sum(cand_res) / len(cand_res)
     ctrl_mean = sum(ctrl_res) / len(ctrl_res)
     excess = cand_mean - ctrl_mean
@@ -272,7 +264,9 @@ def suite_probe(
         control_residual=ctrl_mean,
         excess=excess,
         corpus_words=corpus_words,
-        long_enough=corpus_words >= min_words,
+        long_enough=corpus_words >= min_words and not any(
+            t.get("short") for t in per_task
+        ),
         likely_watermarked=excess >= excess_threshold,
         note=note,
         per_task=per_task,
@@ -288,6 +282,7 @@ def constrained_probe(
     excess_threshold: float = 0.05,
     lang: str = "python",
 ) -> CodeProbeResult:
-    """A single-task probe, kept for a quick check. Prefer suite_probe for power."""
+    """A single-task probe. The sample must still be more than 400 words."""
     return suite_probe(candidate_fn, control_fn, tasks=[task], runs=runs,
-                       excess_threshold=excess_threshold, min_words=0, lang=lang)
+                       excess_threshold=excess_threshold,
+                       min_words=MIN_USEFUL_WORDS, lang=lang)

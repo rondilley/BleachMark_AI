@@ -2,7 +2,7 @@
 
 **Author:** Ron Dilley
 **Date:** 2026-08-10
-**Status:** Draft, updated 2026-08-11 after two AI passes.
+**Status:** Draft, updated 2026-08-13.
 **Companion docs:** `REQUIREMENTS.md`, `SUCCESS_CRITERIA.md`, `ARCHITECTURE.md`,
 `2026-08-10_LLM_Text_Watermarking_Research.md`
 
@@ -69,21 +69,21 @@ identify the author.
 The result is not a data loss. The result is a risk to a person. BleachMark
 bleaches the attribution mark and keeps the author hidden.
 
-Length is important here. High-confidence attribution uses about 400 words or
-more, because the signal grows with length. A short text or a divided text carries
-less signal. For a source at risk, length is a defensive lever, and the tool tells
+Length is important here. High-confidence attribution uses more than 400 words,
+because the signal grows with length. A short text or a divided text is not
+useful. For a source at risk, length is a defensive lever, and the tool tells
 the user this.
 
 The tool does not work as a passive scanner alone. The tool is model-equipped. It
 has the source model and comparison models, but no watermark key at first. It uses
 iteration and comparison across runs and models to find a possible watermark. It
-builds and tests neural methods to detect and to bleach these marks, and it
-measures what works.
+uses a model-based bleach behind a meaning gate, and it measures what works. The
+tool does not classify text as AI-written.
 
 Source code is a strong target. Code has a defined syntax and a small space of
 legitimate variation. A watermark that biases the token choice stands out as odd
-variability. The tool tells a model to write a well-known function many times,
-then it looks for that variability.
+variability. The tool tells a model to write a complete module of more than 400
+words, then it looks for that variability.
 
 A control model helps here. If one model tells that it adds no watermark, and a
 local model adds none, the tool uses each one as a baseline. The difference
@@ -182,9 +182,10 @@ comparison detector and the code probe against a provider model.
 
 **Year 2 — Earn (2027).**
 
-Add measured robustness at scale. A larger benchmark runs more watermark schemes
-and reports the cost to meaning. Add a corpus-level estimator for population
-studies. Add a round-trip translation bleach.
+Add measured robustness at scale. The scheme benchmark, the corpus-level
+estimator, the round-trip translation bleach, and the language-matched meaning
+gate are in the 2026 tree with data. Year 2 work that remains is a
+directory ingest, a service surface, and new schemes as they come.
 
 **Year 3 — Scale (2028).**
 Give a service surface for pipeline integration. Track new watermark schemes as

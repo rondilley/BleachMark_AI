@@ -43,7 +43,7 @@ class ModelConfig:
     model: str
     api_key: str
     temperature: float = 1.0
-    max_tokens: int = 512
+    max_tokens: int = 4096
 
 
 def read_key(provider: str, root: str = ".") -> str:
@@ -151,7 +151,8 @@ def _anthropic(cfg: ModelConfig) -> Callable[[str], str]:
             "anthropic-version": "2023-06-01",
             "Content-Type": "application/json",
         }
-        out = _post("https://api.anthropic.com/v1/messages", headers, body)
+        timeout = int(os.environ.get("BLEACHMARK_API_TIMEOUT", "300"))
+        out = _post("https://api.anthropic.com/v1/messages", headers, body, timeout=timeout)
         parts = [b.get("text", "") for b in out.get("content", []) if b.get("type") == "text"]
         return "".join(parts)
 
@@ -189,7 +190,7 @@ def make_model(
     model: str | None = None,
     root: str = ".",
     temperature: float = 1.0,
-    max_tokens: int = 512,
+    max_tokens: int = 4096,
     base_url: str | None = None,
     gated: bool = True,
 ) -> Callable[[str], str]:

@@ -2,7 +2,7 @@
 
 **Author:** Ron Dilley
 **Date:** 2026-08-10
-**Status:** Draft, updated 2026-08-11 after two AI passes.
+**Status:** Draft, updated 2026-08-13.
 **Companion docs:** `VISION.md`, `SUCCESS_CRITERIA.md`, `ARCHITECTURE.md`,
 `2026-08-10_LLM_Text_Watermarking_Research.md`
 
@@ -174,7 +174,7 @@ tool does not cover image, audio, or video steganography.
   deterministic bleaching. Justification: model-based methods are a first-class
   bleach lever (goal.md reframe).
 - **FR-43** (MVP) The tool SHOULD use NPU or GPU acceleration when the host has it.
-  Justification: neural methods are heavy (goal.md reframe).
+  Justification: local model inference is heavy (goal.md reframe).
 - **FR-44** (MVP) The tool MUST give an effectiveness harness. The harness makes
   watermarked samples with reference generators or test keys, attacks them, and
   measures the detection and bleach rates. Justification: the tool has no key, so
@@ -212,8 +212,8 @@ tool does not cover image, audio, or video steganography.
 
 - **FR-49** (MVP) The tool MUST report a confidence that depends on the text
   length. Detectability scales with length, and high-confidence attribution uses
-  about 400 words or more. Justification: the signal grows with the square root of
-  the token count (research §3, §5).
+  more than 400 words. A shorter generation is not useful. Justification: the
+  signal grows with the square root of the token count (research §3, §5).
 - **FR-50** (MVP) The tool MUST report low confidence for a text below the
   attribution length. The tool MUST NOT overclaim on a short text. Justification:
   a short text carries a weak signal (research §3, §5).
@@ -235,9 +235,10 @@ tool does not cover image, audio, or video steganography.
 - **FR-54** (MVP) The code probe MUST measure the residual variability after
   canonicalization, so the signal is structural token choice, not the code format.
   Justification: a watermark works in the residual channel (FR-46a).
-- **FR-55** (MVP) The code probe MUST aggregate a suite of functions to get to the
-  400-word to 800-word band. Justification: one function is too short for
-  attribution (FR-49).
+- **FR-55** (MVP) Each code-probe generation MUST be more than 400 words. A
+  short function is not useful. The probe asks for a complete module, not one
+  small function. Justification: attribution and the z-test use length
+  (FR-49).
 - **FR-61** (MVP) The tool MUST give a context-keyed signature detector. It
   measures if a model picks one option decisively at each context, and if the
   winner changes across contexts. Justification: a watermark is context-keyed, but

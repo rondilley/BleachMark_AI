@@ -44,7 +44,12 @@ def _cmd_detect(args) -> int:
 
 def _cmd_bleach(args) -> int:
     text = _read_input(args.file)
-    result = bleach_text(text, strength=args.strength)
+    if getattr(args, "translate", False):
+        from .bleach.translate import roundtrip_bleach
+
+        result = roundtrip_bleach(text)
+    else:
+        result = bleach_text(text, strength=args.strength)
     if args.json:
         import json
 
@@ -204,6 +209,18 @@ def _cmd_hardware(args) -> int:
     return 0
 
 
+def _cmd_benchmark(args) -> int:
+    """Run the keyed scheme benchmark and print the BC-04 table (no network)."""
+    from .harness.schemes import run_scheme_benchmark, to_markdown_benchmark
+
+    result = run_scheme_benchmark(samples=args.samples, length=args.length)
+    if args.json:
+        print(json.dumps(result, indent=2))
+    else:
+        print(to_markdown_benchmark(result))
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="bleachmark", description=__doc__)
     sub = p.add_subparsers(dest="command", required=True)
@@ -217,6 +234,8 @@ def build_parser() -> argparse.ArgumentParser:
     b = sub.add_parser("bleach", help="bleach carriers and watermarks")
     b.add_argument("file", nargs="?", help="input file, or - for stdin")
     b.add_argument("--strength", type=int, default=1, help="1 normalize, 2 token, 3 paraphrase")
+    b.add_argument("--translate", action="store_true",
+                   help="round-trip translation bleach (FR-29)")
     b.add_argument("--json", action="store_true", help="emit a JSON bleach summary")
     b.set_defaults(func=_cmd_bleach)
 
@@ -243,7 +262,8 @@ def build_parser() -> argparse.ArgumentParser:
     cp.add_argument("--references", required=True,
                     help="comma-separated reference providers treated as unwatermarked")
     cp.add_argument("--samples", type=int, default=16, help="editorials per model (dense corpus)")
-    cp.add_argument("--min-words", type=int, default=400, help="minimum words per editorial")
+    cp.add_argument("--min-words", type=int, default=400,
+                    help="each editorial must be more than this many words")
     cp.add_argument("--alpha", type=float, default=0.05, help="the rate below which the gap stands out")
     cp.add_argument("--root", default=".", help="root that holds <provider>.key.txt")
     cp.add_argument("--json", action="store_true", help="emit the JSON calibration report")
@@ -254,6 +274,12 @@ def build_parser() -> argparse.ArgumentParser:
     hw.add_argument("--json", action="store_true", help="emit the JSON hardware report")
     hw.add_argument("--root", default=".", help="root that holds <provider>.key.txt")
     hw.set_defaults(func=_cmd_hardware)
+
+    bm = sub.add_parser("benchmark", help="scheme benchmark: detectability drop and meaning cost (BC-04)")
+    bm.add_argument("--samples", type=int, default=24, help="watermarked samples per cell")
+    bm.add_argument("--length", type=int, default=400, help="tokens per sample")
+    bm.add_argument("--json", action="store_true", help="emit the canonical JSON table")
+    bm.set_defaults(func=_cmd_benchmark)
     return p
 
 

@@ -87,6 +87,8 @@ Model-equipped commands (a key file or a local engine is necessary):
 bleachmark hardware               # detect the GPU and video memory, check a local engine, recommend models
 bleachmark calibrate-code   --candidate claude --references openai,gemini --task fib
 bleachmark calibrate-prose  --candidate claude --references openai,gemini,local --samples 16
+bleachmark bleach FILE --translate   # round-trip translation bleach (FR-29)
+bleachmark benchmark                 # scheme table, default 24 samples by 400 tokens (BC-04)
 ```
 
 Point the local commands at a local engine that speaks the OpenAI API:
@@ -99,7 +101,8 @@ bleachmark calibrate-prose --candidate claude --references local --samples 16
 ## Status
 
 - Version: v0.1 built, plus a 2026-08 research tranche on code and prose. The source
-  tree is in `src/bleachmark/`. The test suite has 172 tests and passes.
+  tree is in `src/bleachmark/`. The test suite has 226 tests. One live GGUF
+  generation test is skipped unless `BLEACHMARK_TEST_GGUF` is set on the host.
 - The core detect and carrier-bleach paths use no model and make no network call. The
   keyed and local-inference paths use an optional model or key.
 
@@ -114,7 +117,13 @@ bleachmark calibrate-prose --candidate claude --references local --samples 16
 - The context variants (`detect/keyed/windowed.py`) include the SelfHash scheme
   (Kirchenbauer, arXiv:2306.04634), a context-free scheme, and a window scheme.
 - The green-list z-test, the SynthID g-value test, and the attribution scheme run on
-  the harness samples.
+  the harness samples. An official Transformers SynthID processor cross-check shows
+  each detector fires on its own watermark only.
+- The corpus unigram estimator (`detect/corpus.py`, FR-17) finds a leaky context-free
+  mark across a document set without the key. A distortion-free scheme does not leak
+  this way.
+- Each generation for a watermark or attribution test must be more than 400 words.
+  A live Claude module reached 1110 words. A live local module reached 432 words.
 
 ### Bleach
 
@@ -126,6 +135,12 @@ bleachmark calibrate-prose --candidate claude --references local --samples 16
   equilibrium.
 - The live bleach (`bleach/live.py`) rewrites code and makes sure of the meaning with a
   compile-and-test gate.
+- The round-trip translation bleach (`bleach/translate.py`, FR-29) sends
+  English through a Spanish pivot and back. A scheme benchmark (`bleachmark benchmark`,
+  BC-04, default 24 by 400) reports the detectability drop and the meaning cost
+  for each family. Round-trip is the strongest bleach in that table.
+- The meaning gate is language-matched (FR-27a). Chinese and Japanese use
+  character n-grams. Spanish and Arabic have their own thresholds.
 
 ### Local inference
 
@@ -154,6 +169,7 @@ bleachmark calibrate-prose --candidate claude --references local --samples 16
 - `docs/SUCCESS_CRITERIA.md` — the measurable success criteria.
 - `docs/ARCHITECTURE.md` — the design and why.
 - `docs/2026-08-10_LLM_Text_Watermarking_Research.md` — the research analysis.
+- `docs/2026-08-13_Project_Status.md` — current coverage and remaining work.
 
 ## License
 

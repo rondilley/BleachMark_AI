@@ -2,7 +2,7 @@
 
 from bleachmark.runtime.models import (
     REGISTRY, select_for, recommend, candidates_for,
-    REFERENCE, PARAPHRASE, NEURAL,
+    REFERENCE, PARAPHRASE,
 )
 
 
@@ -30,14 +30,17 @@ def test_select_reports_when_nothing_fits():
 
 
 def test_function_partitions_the_registry():
-    assert all(NEURAL in m.functions for m in candidates_for(NEURAL))
-    # the 70B is a reference model, not a neural detector
+    assert all(PARAPHRASE in m.functions for m in candidates_for(PARAPHRASE))
+    # the 70B is a reference model only; the 3B is a paraphrase model only
     ref_names = {m.name for m in candidates_for(REFERENCE)}
+    para_names = {m.name for m in candidates_for(PARAPHRASE)}
     assert "Llama-3.3-70B-Instruct" in ref_names
-    assert "Llama-3.3-70B-Instruct" not in {m.name for m in candidates_for(NEURAL)}
+    assert "Llama-3.3-70B-Instruct" not in para_names
+    assert "Qwen2.5-3B-Instruct" in para_names
+    assert "Qwen2.5-3B-Instruct" not in ref_names
 
 
 def test_recommend_covers_all_functions():
     rec = recommend(32607)
-    assert set(rec) == {REFERENCE, PARAPHRASE, NEURAL}
-    assert rec[NEURAL].model.params_b == 8.0       # the largest neural model that fits
+    assert set(rec) == {REFERENCE, PARAPHRASE}
+    assert rec[PARAPHRASE].model.params_b == 32.0  # the largest paraphrase model that fits

@@ -66,3 +66,39 @@ def calibrate_meaning_threshold(preserved: list[float], changed: list[float],
         "preserved_mean": round(sum(preserved) / len(preserved), 4) if preserved else None,
         "changed_mean": round(sum(changed) / len(changed), 4) if changed else None,
     }
+
+
+def load_labeled_pairs(path: str | None = None) -> dict:
+    """Load language-labeled preserved/changed sentence pairs (FR-27a)."""
+    import json
+    import os
+
+    src = path or os.path.join(
+        os.path.dirname(__file__), "..", "data", "meaning", "pairs.json"
+    )
+    with open(src, encoding="utf-8") as fh:
+        return json.load(fh)
+
+
+def calibrate_language_thresholds(pairs: dict | None = None,
+                                  target_false_accept: float = 0.0,
+                                  gate=None) -> dict:
+    """Calibrate one threshold per language from labeled pairs (FR-27a)."""
+    from .gate import MeaningGate
+    from .language import detect_language
+
+    gate = gate or MeaningGate()
+    pairs = pairs if pairs is not None else load_labeled_pairs()
+    out = {}
+    for lang, bundle in pairs.items():
+        preserved, changed = [], []
+        for a, b in bundle.get("preserved", []):
+            preserved.append(gate.similarity(a, b, language=lang))
+        for a, b in bundle.get("changed", []):
+            changed.append(gate.similarity(a, b, language=lang))
+        cal = calibrate_meaning_threshold(preserved, changed, target_false_accept)
+        cal["language"] = lang
+        first = bundle.get("preserved") or [["", ""]]
+        cal["detected"] = detect_language(first[0][0])
+        out[lang] = cal
+    return out

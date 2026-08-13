@@ -2,7 +2,7 @@
 
 **Author:** Ron Dilley
 **Date:** 2026-08-10
-**Status:** Draft, updated 2026-08-11 after two AI passes.
+**Status:** Draft, updated 2026-08-13.
 **Companion docs:** `VISION.md`, `REQUIREMENTS.md`, `ARCHITECTURE.md`,
 `2026-08-10_LLM_Text_Watermarking_Research.md`
 
@@ -53,7 +53,9 @@ tags are MVP (v0.1), SCALE (v0.2 and later), and VNEXT (future).
   green-list watermark by a measured value. The report shows the before number
   and the after number.
 - **TC-09** (MVP) Each bleach keeps the semantic similarity in the human-paraphrase
-  band. The gate uses a named metric with a threshold near 0.76.
+  band. The gate uses a named metric. For English the embedding band is near 0.76.
+  For non-English text the gate uses a language-matched metric and threshold
+  (FR-27a).
 - **TC-10** (MVP) The tool rejects a bleach that does not keep the meaning. The tool
   gives the input text and a clear message.
 
@@ -98,8 +100,8 @@ limit (research §5).
 - **TC-22** (MVP) The effectiveness harness reports the detection rate and the
   bleach rate for each stego method. A run makes the samples and measures the two
   rates.
-- **TC-23** (MVP) The tool reports a low confidence for a text below about 400
-  words. The harness shows the confidence as a function of the text length.
+- **TC-23** (MVP) The tool reports a low confidence for a text of 400 words or
+  fewer. The harness shows the confidence as a function of the text length.
 
 ### 2.6 Code probe, adapter, and evolution
 
@@ -107,8 +109,8 @@ limit (research §5).
 
 - **TC-24** (MVP) The code-probe canonicalization gives the same form for two
   cosmetically-different inputs. A structural change gives a different form.
-- **TC-25** (MVP) The code-probe suite corpus is a minimum of 400 words. The
-  probe reports the corpus word count.
+- **TC-25** (MVP) Each code-probe generation is more than 400 words. The probe
+  reports the corpus word count and rejects a short sample.
 - **TC-26** (MVP) The best fitness goes up across the generations. The
   tool records the fitness of each generation.
 - **TC-27** (MVP) The evolved detector estimates the stego partition at a rate of 70
@@ -137,6 +139,9 @@ limit (research §5).
 | TC-09 | Meaning-gate test | Bleach input and output | Similarity in human band | Each build |
 | TC-11 | Network test | Core detect run | No network traffic | Each release |
 | TC-14 | Throughput test | 10 MB text sample | 1 MB each second minimum | Each release |
+| TC-25 | Live length | Live model generation | Each sample more than 400 words | Each release |
+| FR-27a | Language-matched gate | Bundled pairs en/es/zh/ja/ar | Paraphrase passes, other fails | Each build |
+| BC-04 | Scheme benchmark | Reference generators, 24 by 400 | Table of drop and meaning cost | Each release |
 
 ---
 

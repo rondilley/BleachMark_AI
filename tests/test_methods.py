@@ -24,9 +24,13 @@ from bleachmark.harness import generators
 
 def test_length_confidence():
     assert length_confidence(0) == 0.0
+    from bleachmark.detect.length import is_useful_length
+
     assert length_confidence(ATTRIBUTION_WORDS // 2) == 0.5
     assert length_confidence(ATTRIBUTION_WORDS) == 1.0
     assert length_confidence(ATTRIBUTION_WORDS * 2) == 1.0
+    assert is_useful_length("word " * ATTRIBUTION_WORDS) is False
+    assert is_useful_length("word " * (ATTRIBUTION_WORDS + 1)) is True
 
 
 # ---- Slice 4: comparison detector -----------------------------------------

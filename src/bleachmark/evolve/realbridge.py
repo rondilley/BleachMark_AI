@@ -23,19 +23,10 @@ from typing import Callable
 
 from ..detect.code import _residual_variability
 
-TASKS = [
-    "check whether an integer is prime",
-    "return the nth Fibonacci number",
-    "compute the greatest common divisor of two integers",
-    "return the maximum value in a list",
-]
+from ..detect.code import DEFAULT_SUITE, DEFAULT_SUITE_C
 
-TASKS_C = [
-    "check whether an integer is prime",
-    "return the nth Fibonacci number",
-    "compute the greatest common divisor of two integers",
-    "return the maximum value in an int array",
-]
+TASKS = list(DEFAULT_SUITE)
+TASKS_C = list(DEFAULT_SUITE_C)
 
 
 @dataclass
@@ -66,16 +57,22 @@ class RealPromptGenome:
         return g
 
     def compile_prompt(self, task: str) -> str:
+        from ..detect.length import length_requirement
+
         if self.lang == "c":
-            parts = [f"Write a C function for: {task}."]
+            parts = [f"Write a complete C module for: {task}."]
             sig = "int f(int x)"
         else:
-            parts = [f"Write a Python function for: {task}."]
+            parts = [f"Write a complete Python module for: {task}."]
             sig = "def f(x)"
+        parts.append(length_requirement())
         if self.fix_names:
-            parts.append(f"Use exactly this signature: {sig}. Name every local a, b, c.")
+            parts.append(f"Use exactly this public entry: {sig}. Name every local a, b, c.")
         if self.fix_structure:
-            parts.append("Use a single loop and a single return. Do not use a helper.")
+            parts.append(
+                "Use one public entry and helpers named h0, h1, h2. "
+                "Helpers are allowed so the module can exceed 400 words."
+            )
         if self.iterative_only:
             parts.append("Iterative only, no recursion.")
         if self.no_comments:

@@ -41,7 +41,7 @@ def ensure_model(spec: ModelSpec, cache_dir: str | None = None) -> str:
 
 
 def make_local_llama(model_path: str, n_gpu_layers: int = -1, n_ctx: int = 4096,
-                     temperature: float = 1.0, max_tokens: int = 512):
+                     temperature: float = 1.0, max_tokens: int = 1600):
     """Build a callable(prompt)->text backed by an in-process llama.cpp model.
 
     n_gpu_layers = -1 puts every layer on the GPU; the caller can lower it when the model does
@@ -66,12 +66,18 @@ def make_local_llama(model_path: str, n_gpu_layers: int = -1, n_ctx: int = 4096,
     return call
 
 
-def deploy(function: str, cache_dir: str | None = None, n_ctx: int = 4096, **gen):
+def deploy(function: str, cache_dir: str | None = None, n_ctx: int = 4096,
+           local_path: str | None = None, **gen):
     """Detect the hardware, select a model for the function, download it, and load it.
 
-    Returns (callable, ModelSpec, model_path). This downloads several gigabytes on the first
-    call, so it is not run by the test suite.
+    Returns (callable, ModelSpec | None, model_path). The registry path downloads several
+    gigabytes on the first call, so it is not run by the test suite. When local_path points
+    at a GGUF already on disk, the download and the registry selection are skipped, so an
+    air-gapped host (or a test) can run a model it already has.
     """
+    if local_path is not None:
+        fn = make_local_llama(local_path, n_gpu_layers=-1, n_ctx=n_ctx, **gen)
+        return fn, None, local_path
     profile = detect_hardware()
     best = profile.best_gpu()
     budget = best.vram_total_mb if best else 0

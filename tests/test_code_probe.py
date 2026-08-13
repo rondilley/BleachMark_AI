@@ -1,11 +1,14 @@
 """Verify the constrained code probe minimizes the stego surface (FR-46a).
 
 Canonicalization must remove naming, whitespace, comment, and literal-format
-channels, leaving only structural token choice. The suite must reach the
-400-to-800-word attribution band (FR-49).
+channels, leaving only structural token choice. Each generation must be more
+than 400 words (FR-49, FR-55). A short function is not useful.
 """
 
-from bleachmark.detect.code import canonicalize, suite_probe, DEFAULT_SUITE
+from bleachmark.detect.code import (
+    canonicalize, suite_probe, DEFAULT_SUITE, _PROMPT_PY, _PROMPT_C,
+)
+from bleachmark.detect.length import ATTRIBUTION_WORDS, length_requirement
 
 
 def test_canonicalize_collapses_cosmetic_channels():
@@ -58,11 +61,38 @@ def _structural_model():
     return fn
 
 
+def _pad(text: str) -> str:
+    return text + " " + " ".join(f"w{i}" for i in range(ATTRIBUTION_WORDS + 20))
+
+
+def _long(model):
+    inner = model()
+
+    def fn(prompt):
+        return _pad(inner(prompt))
+
+    return fn
+
+
+def test_generation_prompt_demands_more_than_400_words():
+    req = length_requirement()
+    assert str(ATTRIBUTION_WORDS) in req
+    assert "more than" in req.lower()
+    assert req in _PROMPT_PY
+    assert req in _PROMPT_C
+
+
+def test_short_samples_are_not_long_enough():
+    result = suite_probe(_structural_model(), _canonical_model(), runs=2)
+    assert result.long_enough is False
+    assert all(t["short"] for t in result.per_task)
+
+
 def test_suite_probe_reaches_length_band():
-    # 10 tasks * 6 runs * a small function clears the 400-word corpus floor
-    result = suite_probe(_structural_model(), _canonical_model(), runs=6)
-    assert result.corpus_words >= 400
+    result = suite_probe(_long(_structural_model), _long(_canonical_model), runs=2)
+    assert result.corpus_words > ATTRIBUTION_WORDS
     assert result.long_enough
+    assert not any(t["short"] for t in result.per_task)
 
 
 def test_suite_probe_flags_structural_excess_only():

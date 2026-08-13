@@ -2,7 +2,7 @@
 
 **Author:** Ron Dilley
 **Date:** 2026-08-10
-**Status:** v0.1 built, updated 2026-08-11.
+**Status:** v0.1 built, updated 2026-08-13.
 **Companion docs:** `VISION.md`, `REQUIREMENTS.md`, `SUCCESS_CRITERIA.md`,
 `2026-08-10_LLM_Text_Watermarking_Research.md`
 
@@ -128,6 +128,9 @@ model and no meaning cost. The middle strength makes token-level edits. The high
 strength makes a semantic paraphrase with a model, which is the cleanest strip but
 uses a model and costs some meaning. A ladder lets the user select the trade-off.
 The gate rejects each result that does not keep the meaning (FR-27, FR-28).
+
+For non-English text the gate uses a language-matched metric and threshold
+(FR-27a). Chinese and Japanese use character n-grams. Arabic has its own floor.
 
 How it could be incorrect. The paraphrase strength uses a model, which is a heavy
 dependency. Mitigation: the model sits behind an optional install group, and the
@@ -299,7 +302,7 @@ paraphrase bleach and the active test spend a model request, and the two are opt
 ```
 src/bleachmark/
   __init__.py          package API surface
-  cli.py               detect, bleach, report, calibrate-code, calibrate-prose, hardware
+  cli.py               detect, bleach, report, calibrate-code, calibrate-prose, hardware, benchmark
   model.py             shared data model: Finding, Score, Report
   decode.py            UTF-8 to codepoint decode with offsets
   detect/
@@ -315,10 +318,12 @@ src/bleachmark/
     context_keyed.py   context-keyed signature, watermark against style
     attribution.py     multi-bit user-attribution estimate
     length.py          length-aware detection confidence (attribution length)
+    corpus.py          corpus-level unigram green-bias estimator (FR-17)
     keyed/
       greenlist.py     green-list z-test (Kirchenbauer, arXiv:2301.10226)
       windowed.py      context variants: unigram, window, SelfHash (arXiv:2306.04634)
-      synthid.py       SynthID-Text detector
+      synthid.py       SynthID-Text detector (tool scheme)
+      synthid_official.py official Transformers processor cross-check
       active.py        black-box watermark-presence test
   bleach/
     __init__.py        bleach interface and strength ladder
@@ -328,16 +333,20 @@ src/bleachmark/
     attribution.py     defeat a user-attribution mark
     gate.py            meaning-preservation gate (token or embedding similarity)
     meaning_calibrate.py the gate threshold from labeled paraphrase pairs
+    language.py        script + function-word language detect (FR-27a)
     live.py            live bleach, compile-and-test meaning gate, calibration runs
     reorder.py         the reverse-order bleach for prose
     strategies.py      the bleach-strategy library (reorder and transcode families)
     transcode.py       the deterministic transcode translator (reversed-word)
+    translate.py       round-trip translation bleach, dictionary pivot (FR-29)
   report/
     json_emit.py       canonical JSON report
     markdown_emit.py   Markdown report from the JSON model
     calibration_emit.py the calibrated finding as Markdown or JSON
   data/
     codepoints/        codepoint set data files
+    meaning/           language-matched gate thresholds and labeled pairs
+    translate/         EN-ES pivot lexicon for the round-trip bleach
   runtime/
     model.py           the one model gateway, sanitize before every call
     accel.py           accelerator kind: cuda, npu, metal, cpu
@@ -349,6 +358,7 @@ src/bleachmark/
     generators.py      reference watermark generators and test keys
     measure.py         attack the samples and measure the rates
     throughput.py      carrier-scan throughput benchmark (>= 1 MB/s, NFR-01)
+    schemes.py         scheme benchmark: detectability drop and meaning cost (BC-04)
   evolve/
     arena.py           known stego embedder and the estimating detector
     evolution.py       the prompt and detector genomes and the loop
@@ -420,8 +430,12 @@ covers these parts:
 - The effectiveness harness and the NPU or GPU acceleration.
 - The JSON and Markdown reports, the CLI, and the library.
 
-**v0.2 (SCALE).** The larger benchmark. The corpus-level estimator. The round-trip
-translation bleach.
+**v0.2 (SCALE).** The larger scheme benchmark (BC-04) is built
+(`harness/schemes.py`, default 24 samples by 400 tokens). The corpus-level
+unigram estimator (FR-17) is built (`detect/corpus.py`). The round-trip
+translation bleach (FR-29) is built (`bleach/translate.py`). The
+language-matched meaning gate (FR-27a) is built (`bleach/language.py`).
+These SCALE items have code and measured data.
 
 **v0.3 (VNEXT).** A local service surface for pipeline integration. A tracker for
 new watermark schemes.
@@ -439,8 +453,8 @@ syntax tree, renames each identifier, and unparses (FR-53). This removes the nam
 the whitespace, the comment, and the literal-format channels. This leaves only
 structural token choice, and a watermark must work there (FR-54).
 
-The probe aggregates a suite of functions to get to the 400-word band (FR-55,
-FR-49). One canonical function is too short for attribution.
+Each generation must be more than 400 words (FR-55, FR-49). A short function is
+not useful. The probe asks for a complete module.
 
 How it could be incorrect. A fully canonical task gives the model no room. The watermark and the detector
 then have no signal. Mitigation: the evolution
@@ -511,19 +525,34 @@ the tool reports an honest null, not an incorrect flag (FR-62).
 
 ## 18. Open questions
 
-- Which paraphrase model gives the cleanest bleach for each meaning cost on a local
-  runtime? A benchmark must give the answer.
-- What is the correct meaning-gate threshold for a high-stakes text? The research
-  gives a band, not a single number (research §4).
-- Can the corpus-level green-list estimator give a useful signal on a document set without a key? A test must give the answer.
-- Can the mixed-script test hold 1 MB each second in pure Python, or must it have a
-  compiled part? A benchmark must give the answer (NFR-01).
-  <!-- AI review 20260810-234903: gemini, xai -->
-- How does the NPU or GPU acceleration stay the same on Windows and on POSIX
-  (NFR-04, FR-43)? What is the fallback when the host has no accelerator? A
-runtime-selection plan must give the answer.
-  <!-- AI review 20260811-003657: gemini, openai -->
-- What is the null hypothesis for the comparison detector, so it does not confuse
-  sampler variance or model style with a watermark? A method and a benchmark must
-give the answer (research §5).
+Which paraphrase model gives the cleanest bleach for each meaning cost on a local
+runtime? A benchmark must give the answer.
+
+What is the correct meaning-gate threshold for a high-stakes text? The research
+gives a band, not a single number (research §4).
+
+Can the corpus-level green-list estimator give a useful signal on a document set
+without a key? Answered 2026-08-13. A unigram (leaky) mark on local Mistral-7B
+gave z 5.16 against a same-source control at z 0.34.
+
+A distortion-free scheme has no keyless leak. See
+`docs/results/2026-08-12_corpus_estimator_real.json`.
+
+Can the mixed-script test hold 1 MB each second in pure Python, or must it have a
+compiled part? Answered 2026-08-12. Typical 8.5 MB/s, worst-case 1.9 MB/s.
+
+The two rates are above 1 MB/s (NFR-01). No compiled part.
+<!-- AI review 20260810-234903: gemini, xai -->
+
+How does the NPU or GPU acceleration stay the same on Windows and on POSIX
+(NFR-04, FR-43)? Partial. `runtime/accel.py` gives a label.
+
+Local llama.cpp uses the GPU when the host has one. Defer a full dispatcher.
+<!-- AI review 20260811-003657: gemini, openai -->
+
+What is the null hypothesis for the comparison detector, so it does not confuse
+sampler variance or model style with a watermark? Answered 2026-08-11.
+
+The null is a same-size style baseline from reference corpora, reported as an
+FPR (`detect/calibrate.py`). A same-model control beats a different-model control.
   <!-- AI review 20260811-003657: claude, gemini, openai -->

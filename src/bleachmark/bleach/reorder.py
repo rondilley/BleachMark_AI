@@ -48,7 +48,8 @@ def reorder_reverse(text: str) -> str:
 def reverse_prompt(task_desc: str, min_words: int = 400) -> str:
     """Tell the model to write the prose with the sentences in reverse order."""
     return (
-        f"Write {task_desc}. It must be at least {min_words} words. "
+        f"Write {task_desc}. The output must be more than {min_words} words. "
+        "Shorter output is not useful and is rejected. "
         "Write the sentences in REVERSE order: put the last sentence first, the "
         "second-to-last sentence second, and so on, so the first sentence comes last. "
         "Each sentence must read correctly on its own. Return only the prose."
@@ -71,7 +72,7 @@ def fidelity(reference_forward: str, bleached_forward: str, gate: MeaningGate | 
     """
     gate = gate or MeaningGate(threshold=0.5)
     score = gate.similarity(reference_forward, bleached_forward, language=language)
-    return FidelityResult(score=score, ok=gate.passes(score))
+    return FidelityResult(score=score, ok=gate.passes(score, language=language))
 
 
 # --- ground-truth degradation with the real context-keyed green-list scheme ----

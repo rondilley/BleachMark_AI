@@ -1,0 +1,92 @@
+{
+  "en": {
+    "preserved": [
+      ["The black cat sleeps in the large house.", "The dark cat sleeps in the big house."],
+      ["Cities should build more bike lanes now.", "Towns ought to construct more bicycle paths now."],
+      ["She opened the window and felt the cold air.", "She opened the window and felt the chilly air."],
+      ["The committee decided to delay the vote.", "The committee chose to postpone the vote."],
+      ["Rain fell on the empty street all night.", "Rain fell on the vacant street all night."],
+      ["He wrote a long letter to his friend.", "He wrote a lengthy letter to his friend."]
+    ],
+    "changed": [
+      ["The black cat sleeps in the large house.", "Trains leave the station at five o'clock."],
+      ["Cities should build more bike lanes now.", "The ocean is deep and cold in winter."],
+      ["She opened the window and felt the cold air.", "The baker sold bread before sunrise."],
+      ["The committee decided to delay the vote.", "A river cuts through the dry valley."],
+      ["Rain fell on the empty street all night.", "The piano needs a new set of strings."],
+      ["He wrote a long letter to his friend.", "Copper melts at a high temperature."]
+    ]
+  },
+  "es": {
+    "preserved": [
+      ["El gato negro duerme en la casa grande.", "El gato oscuro duerme en la vivienda grande."],
+      ["Las ciudades deben construir mas carriles bici.", "Las urbes deben construir mas vias para bicicletas."],
+      ["Ella abrio la ventana y sintio el aire frio.", "Ella abrio la ventana y sintio el aire helado."],
+      ["El comite decidio retrasar la votacion.", "El comite opto por posponer la votacion."],
+      ["La lluvia cayo en la calle vacia toda la noche.", "La lluvia cayo en la via vacia toda la noche."],
+      ["El escribio una carta larga a su amigo.", "El escribio una carta extensa a su amigo."]
+    ],
+    "changed": [
+      ["El gato negro duerme en la casa grande.", "Los trenes salen de la estacion a las cinco."],
+      ["Las ciudades deben construir mas carriles bici.", "El oceano es profundo y frio en invierno."],
+      ["Ella abrio la ventana y sintio el aire frio.", "El panadero vendio pan antes del amanecer."],
+      ["El comite decidio retrasar la votacion.", "Un rio corta el valle seco."],
+      ["La lluvia cayo en la calle vacia toda la noche.", "El piano necesita un juego nuevo de cuerdas."],
+      ["El escribio una carta larga a su amigo.", "El cobre se funde a alta temperatura."]
+    ]
+  },
+  "zh": {
+    "preserved": [
+      ["北京今天天气很好。", "北京今日天气不错。"],
+      ["他在图书馆安静地看书。", "他在图书馆静静地读书。"],
+      ["城市应该修建更多自行车道。", "城市应当建设更多自行车道。"],
+      ["她打开窗户感受冷空气。", "她打开窗户感受凉空气。"],
+      ["委员会决定推迟投票。", "委员会决定延期投票。"],
+      ["他给朋友写了一封长信。", "他给友人写了一封长信。"]
+    ],
+    "changed": [
+      ["北京今天天气很好。", "火车五点离开车站。"],
+      ["他在图书馆安静地看书。", "冬天的海又深又冷。"],
+      ["城市应该修建更多自行车道。", "面包师黎明前卖掉面包。"],
+      ["她打开窗户感受冷空气。", "一条河穿过干燥的山谷。"],
+      ["委员会决定推迟投票。", "钢琴需要一套新弦。"],
+      ["他给朋友写了一封长信。", "铜在高温下熔化。"]
+    ]
+  },
+  "ja": {
+    "preserved": [
+      ["今日は天気がとても良い。", "今日は空模様がとても良い。"],
+      ["彼は図書館で静かに本を読む。", "彼は図書館で静かに書物を読む。"],
+      ["都市は自転車道をもっと作るべきだ。", "都市は自転車道をもっと造るべきだ。"],
+      ["彼女は窓を開けて冷たい空気を感じた。", "彼女は窓を開けて冷たい空気を覚えた。"],
+      ["委員会は投票を延期すると決めた。", "委員会は投票を先送りすると決めた。"],
+      ["彼は友人に長い手紙を書いた。", "彼は友人に長い書簡を書いた。"]
+    ],
+    "changed": [
+      ["今日は天気がとても良い。", "列車は五時に駅を出る。"],
+      ["彼は図書館で静かに本を読む。", "冬の海は深くて冷たい。"],
+      ["都市は自転車道をもっと作るべきだ。", "パン屋は夜明け前にパンを売った。"],
+      ["彼女は窓を開けて冷たい空気を感じた。", "川が乾いた谷を横切る。"],
+      ["委員会は投票を延期すると決めた。", "ピアノには新しい弦が要る。"],
+      ["彼は友人に長い手紙を書いた。", "銅は高温で溶ける。"]
+    ]
+  },
+  "ar": {
+    "preserved": [
+      ["القطة السوداء تنام في البيت الكبير.", "القطة الداكنة تنام في المنزل الكبير."],
+      ["يجب على المدن بناء مزيد من مسارات الدراجات.", "ينبغي على المدن شق مزيد من مسارات الدراجات."],
+      ["فتحت النافذة وشعرت بالهواء البارد.", "فتحت النافذة واحست بالهواء البارد."],
+      ["قررت اللجنة تاجيل التصويت.", "قررت اللجنة ارجاء التصويت."],
+      ["سقط المطر على الشارع الفارغ طوال الليل.", "سقط المطر على الطريق الفارغ طوال الليل."],
+      ["كتب رسالة طويلة الى صديقه.", "كتب خطابا طويلا الى صديقه."]
+    ],
+    "changed": [
+      ["القطة السوداء تنام في البيت الكبير.", "تغادر القطارات المحطة في الساعة الخامسة."],
+      ["يجب على المدن بناء مزيد من مسارات الدراجات.", "البحر عميق وبارد في الشتاء."],
+      ["فتحت النافذة وشعرت بالهواء البارد.", "باع الخباز الخبز قبل الفجر."],
+      ["قررت اللجنة تاجيل التصويت.", "يقطع نهر الوادي الجاف."],
+      ["سقط المطر على الشارع الفارغ طوال الليل.", "البيانو يحتاج الى اوتار جديدة."],
+      ["كتب رسالة طويلة الى صديقه.", "ينصهر النحاس في درجة حرارة عالية."]
+    ]
+  }
+}

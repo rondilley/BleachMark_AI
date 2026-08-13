@@ -17,7 +17,6 @@ from dataclasses import dataclass
 # functions the tool runs a local model for
 REFERENCE = "reference"       # unwatermarked generation for a calibration baseline
 PARAPHRASE = "paraphrase"     # a paraphrase bleach
-NEURAL = "neural_detect"      # a small neural detector
 
 
 @dataclass(frozen=True)
@@ -48,10 +47,10 @@ REGISTRY: list[ModelSpec] = [
               (REFERENCE, PARAPHRASE)),
     ModelSpec("Llama-3.1-8B-Instruct", 8.0, "Q4_K_M",
               "bartowski/Meta-Llama-3.1-8B-Instruct-GGUF", "Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf",
-              (REFERENCE, PARAPHRASE, NEURAL)),
+              (REFERENCE, PARAPHRASE)),
     ModelSpec("Qwen2.5-3B-Instruct", 3.0, "Q4_K_M",
               "bartowski/Qwen2.5-3B-Instruct-GGUF", "Qwen2.5-3B-Instruct-Q4_K_M.gguf",
-              (NEURAL,)),
+              (PARAPHRASE,)),
 ]
 
 
@@ -86,4 +85,4 @@ def select_for(function: str, vram_mb: int) -> Selection:
 
 def recommend(vram_mb: int) -> dict:
     """A per-function selection for a video-memory budget."""
-    return {fn: select_for(fn, vram_mb) for fn in (REFERENCE, PARAPHRASE, NEURAL)}
+    return {fn: select_for(fn, vram_mb) for fn in (REFERENCE, PARAPHRASE)}
